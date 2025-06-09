@@ -7,7 +7,7 @@ import alpaca_trade_api as tradeapi
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 
-# --- Backtesting function (no changes needed here) ---
+# --- We will add debug lines to this function ---
 def run_backtest_for_dashboard(symbol, start_date, end_date, config, regime_window=200):
     try:
         client = TiingoClient(config)
@@ -16,7 +16,6 @@ def run_backtest_for_dashboard(symbol, start_date, end_date, config, regime_wind
         if data.empty:
             return None, None
     except Exception as e:
-        # We will return the error instead of displaying it directly
         return None, str(e)
 
     data['regime_ma'] = data['Adj Close'].rolling(window=regime_window).mean()
@@ -33,10 +32,19 @@ def run_backtest_for_dashboard(symbol, start_date, end_date, config, regime_wind
             data['signal'][i] = data['signal'][i-1]
     data['signal'] = data['signal'].shift(1)
 
+    # --- NEW TEMPORARY DEBUGGING SECTION ---
+    # This will print info to the app for each stock as it's being tested.
+    st.info(f"--- Debug Info for {symbol} ---")
+    st.write("Columns in DataFrame:", data.columns.tolist())
+    st.write("First 5 rows of data:")
+    st.dataframe(data.head())
+    st.write("--- End Debug Info ---")
+    # --- END DEBUGGING SECTION ---
+
     data['daily_return'] = data['Adj Close'].pct_change()
     data['strategy_return'] = data['daily_return'] * data['signal']
     data['buy_hold_cumulative'] = (1 + data['daily_return']).cumprod()
-    data['strategy_cumulative'] = (1 + data['strategy_cumulative']).cumprod()
+    data['strategy_cumulative'] = (1 + data['strategy_return']).cumprod() # This is where the error happens
     data.dropna(inplace=True)
 
     buy_hold_return = (data['buy_hold_cumulative'].iloc[-1] - 1) * 100
@@ -53,11 +61,10 @@ def run_backtest_for_dashboard(symbol, start_date, end_date, config, regime_wind
     
     return results, fig
 
-# --- STREAMLIT WEB APPLICATION ---
+# --- STREAMLIT WEB APPLICATION (No changes needed below this line) ---
 st.set_page_config(layout="wide")
 st.title("Quantitative Trading Dashboard")
 
-# --- Load API Keys ---
 try:
     tiingo_key = st.secrets["tiingo"]["api_key"]
     alpaca_key_id = st.secrets["alpaca"]["api_key_id"]
@@ -72,23 +79,19 @@ except:
 tiingo_config = {'api_key': tiingo_key, 'session': True}
 tiingo_client = TiingoClient(tiingo_config)
 
-# --- Define the Tabs ---
 tab_live, tab_backtest = st.tabs(["Live Account Dashboard", "Strategy Backtester"])
 
-# --- Content for the First Tab ---
 with tab_live:
-    # ... (The Live Dashboard code is the same as before) ...
     st.header("Live Alpaca Account Status")
+    # ... (code is the same)
     try:
         base_url = 'https://paper-api.alpaca.markets'
         api = tradeapi.REST(alpaca_key_id, alpaca_secret_key, base_url, api_version='v2')
         account = api.get_account()
-        
         col1, col2, col3 = st.columns(3)
         col1.metric("Portfolio Value", f"${float(account.portfolio_value):,}")
         col2.metric("Buying Power", f"${float(account.buying_power):,}")
         col3.metric("Account Status", account.status)
-
         st.divider()
         st.subheader("Live Quote by Ticker")
         col1_quote, col2_quote = st.columns([1, 3])
@@ -113,7 +116,6 @@ with tab_live:
                 st.metric(label=f"Last Price for {res['symbol']}", value=res["price"], delta=res["delta"])
                 st.caption(f"Based on intraday change from open. Date: {res['timestamp']}")
         st.divider()
-
         positions = api.list_positions()
         if positions:
             st.subheader("Current Positions")
@@ -132,7 +134,6 @@ with tab_live:
                 st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("You have no open positions.")
-
         trades = api.get_activities(activity_types='FILL', direction='desc')[:20]
         if trades:
             st.subheader("Recent Trades")
@@ -144,21 +145,16 @@ with tab_live:
     except Exception as e:
         st.error(f"Could not connect to Alpaca or fetch account data. Error: {e}")
 
-# --- Content for the Second Tab ---
 with tab_backtest:
     st.header("Individual Strategy Backtester")
     with st.expander("About the Adaptive Momentum Strategy"):
-        st.markdown("...") # Same description as before
-    
+        st.markdown("...")
     st.write("Enter a stock ticker to backtest the strategy.")
     symbol = st.text_input("Stock Ticker", "NVDA", key="backtest_symbol").upper()
-
     if st.button("Run Single Backtest"):
         if symbol:
             with st.spinner(f"Running backtest for {symbol}..."):
-                results, chart_figure = run_backtest_for_dashboard(
-                    symbol=symbol, start_date='2015-01-01', end_date='2025-06-09', config=tiingo_config
-                )
+                results, chart_figure = run_backtest_for_dashboard(symbol=symbol, start_date='2015-01-01', end_date='2025-06-09', config=tiingo_config)
             if results and chart_figure:
                 st.success(f"Backtest for {symbol} complete!")
                 col1, col2 = st.columns(2)
@@ -169,43 +165,21 @@ with tab_backtest:
                 st.error(f"Could not retrieve data or run backtest. Error: {chart_figure}")
         else:
             st.warning("Please enter a stock ticker.")
-    
     st.divider()
-
-    # --- NEW: BATCH BACKTESTER SECTION ---
     st.header("Batch Test on Recommended Stocks")
     st.write("Click the button below to run the backtest on a curated list of historically trending stocks.")
-
-    # Define the list of stocks to test
     recommended_tickers = ["AAPL", "MSFT", "AMZN", "META", "TSLA"]
     st.write("Recommended Tickers:", ", ".join(recommended_tickers))
-
     if st.button("Run Batch Backtest"):
         batch_results = []
-        # Create a placeholder for the results table
         results_placeholder = st.empty()
-
         for ticker in recommended_tickers:
             with st.spinner(f"Testing {ticker}..."):
-                # Run the same backtest function
-                results, fig = run_backtest_for_dashboard(
-                    symbol=ticker, start_date='2015-01-01', end_date='2025-06-09', config=tiingo_config
-                )
+                results, fig = run_backtest_for_dashboard(symbol=ticker, start_date='2015-01-01', end_date='2025-06-09', config=tiingo_config)
                 if results:
-                    batch_results.append({
-                        'Symbol': ticker,
-                        'Buy & Hold Return': results['buy_and_hold'],
-                        'Strategy Return': results['strategy']
-                    })
+                    batch_results.append({'Symbol': ticker, 'Buy & Hold Return': results['buy_and_hold'], 'Strategy Return': results['strategy']})
                 else:
-                    batch_results.append({
-                        'Symbol': ticker,
-                        'Buy & Hold Return': 'Error',
-                        'Strategy Return': 'Error'
-                    })
-                
-                # Update the results table after each stock is tested
+                    batch_results.append({'Symbol': ticker, 'Buy & Hold Return': 'Error', 'Strategy Return': 'Error'})
                 results_df = pd.DataFrame(batch_results)
                 results_placeholder.dataframe(results_df, use_container_width=True)
-
         st.success("Batch backtest complete!")
