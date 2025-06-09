@@ -35,7 +35,7 @@ def run_backtest_for_dashboard(symbol, start_date, end_date, config, regime_wind
     data['daily_return'] = data['Adj Close'].pct_change()
     data['strategy_return'] = data['daily_return'] * data['signal']
     data['buy_hold_cumulative'] = (1 + data['daily_return']).cumprod()
-    data['strategy_cumulative'] = (1 + data['strategy_return']).cumprod()
+    data['strategy_cumulative'] = (1 + data['strategy_cumulative']).cumprod()
     data.dropna(inplace=True)
 
     buy_hold_return = (data['buy_hold_cumulative'].iloc[-1] - 1) * 100
@@ -56,7 +56,7 @@ def run_backtest_for_dashboard(symbol, start_date, end_date, config, regime_wind
 st.set_page_config(layout="wide")
 st.title("Quantitative Trading Dashboard")
 
-# --- Load API Keys (This stays at the top) ---
+# --- Load API Keys ---
 try:
     tiingo_key = st.secrets["tiingo"]["api_key"]
     alpaca_key_id = st.secrets["alpaca"]["api_key_id"]
@@ -70,73 +70,75 @@ except:
 
 tiingo_config = {'api_key': tiingo_key, 'session': True}
 
-# --- NEW: DEFINE THE TABS ---
-tab_live, tab_backtest = st.tabs(["Live Account Dashboard", "Strategy Backtester"])
 
-# --- NEW: CONTENT FOR THE FIRST TAB ---
-with tab_live:
-    st.header("Live Alpaca Account Status")
-    try:
-        base_url = 'https://paper-api.alpaca.markets'
-        api = tradeapi.REST(alpaca_key_id, alpaca_secret_key, base_url, api_version='v2')
-        account = api.get_account()
-        
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Portfolio Value", f"${float(account.portfolio_value):,}")
-        col2.metric("Buying Power", f"${float(account.buying_power):,}")
-        col3.metric("Account Status", account.status)
+# --- LIVE ALPACA ACCOUNT STATUS ---
+st.header("Live Alpaca Account Status")
 
-        positions = api.list_positions()
-        if positions:
-            st.subheader("Current Positions")
-            pos_data = [{'Symbol': p.symbol, 'Qty': float(p.qty), 'Market Value': f"${float(p.market_value):,}", 'Current Price': f"${float(p.current_price):,}", 'Unrealized P/L': f"${float(p.unrealized_pl):,}"} for p in positions]
-            positions_df = pd.DataFrame(pos_data)
-            st.dataframe(positions_df, use_container_width=True)
-        else:
-            st.info("You have no open positions.")
-
-        trades = api.get_activities(activity_types='fill', direction='desc', limit=20)
-        if trades:
-            st.subheader("Recent Trades")
-            trade_data = [{'Time': t.transaction_time.strftime('%Y-%m-%d %H:%M'), 'Symbol': t.symbol, 'Side': t.side, 'Qty': float(t.qty), 'Price': f"${float(t.price):,}"} for t in trades]
-            trades_df = pd.DataFrame(trade_data)
-            st.dataframe(trades_df, use_container_width=True)
-        else:
-            st.info("No recent trades found.")
-    except Exception as e:
-        st.error(f"Could not connect to Alpaca or fetch account data. Error: {e}")
-
-# --- NEW: CONTENT FOR THE SECOND TAB ---
-with tab_backtest:
-    st.header("Strategy Backtester")
-    with st.expander("About the Adaptive Momentum Strategy"):
-        st.markdown("""
-        This strategy is a **trend-following system** designed to adapt to different market regimes. It uses a long-term moving average to identify the overall trend.
-        **Core Logic:**
-        - **Regime Filter:** A 200-day simple moving average (SMA) determines the market "regime."
-        - **Buffer Zone:** A 2% buffer is applied above and below the 200-day SMA to create a neutral zone. This helps prevent "whipsaws" (bad trades) during choppy, non-trending periods.
-        **Trading Rules:**
-        1.  **Buy Signal (Risk-On):** A position is entered only if the price moves **more than 2% above** the 200-day SMA.
-        2.  **Sell Signal (Risk-Off):** The position is sold only if the price drops **more than 2% below** the 200-day SMA.
-        3.  **Hold:** If the price is within the +/- 2% buffer zone, the strategy holds its current position.
-        """)
+try:
+    base_url = 'https://paper-api.alpaca.markets'
+    api = tradeapi.REST(alpaca_key_id, alpaca_secret_key, base_url, api_version='v2')
+    account = api.get_account()
     
-    st.write("Enter a stock ticker to backtest the strategy.")
-    symbol = st.text_input("Stock Ticker (e.g., AAPL, MSFT, SPY)", "NVDA", key="backtest_symbol").upper()
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Portfolio Value", f"${float(account.portfolio_value):,}")
+    col2.metric("Buying Power", f"${float(account.buying_power):,}")
+    col3.metric("Account Status", account.status)
 
-    if st.button("Run Backtest"):
-        if symbol:
-            with st.spinner(f"Running backtest for {symbol}..."):
-                results, chart_figure = run_backtest_for_dashboard(
-                    symbol=symbol, start_date='2015-01-01', end_date='2025-06-09', config=tiingo_config
-                )
-            if results:
-                st.success(f"Backtest for {symbol} complete!")
-                col1, col2 = st.columns(2)
-                col1.metric("Buy & Hold Return", results["buy_and_hold"])
-                col2.metric("Strategy Return", results["strategy"])
-                st.pyplot(chart_figure)
-            else:
-                st.error(f"Could not retrieve data or run backtest for {symbol}.")
+    positions = api.list_positions()
+    if positions:
+        st.subheader("Current Positions")
+        pos_data = [{'Symbol': p.symbol, 'Qty': float(p.qty), 'Market Value': f"${float(p.market_value):,}", 'Current Price': f"${float(p.current_price):,}", 'Unrealized P/L': f"${float(p.unrealized_pl):,}"} for p in positions]
+        positions_df = pd.DataFrame(pos_data)
+        st.dataframe(positions_df, use_container_width=True)
+    else:
+        st.info("You have no open positions.")
+    
+    # This is the corrected line for fetching trades
+    trades = api.get_activities(activity_types='fill', direction='desc')[:20]
+    
+    if trades:
+        st.subheader("Recent Trades")
+        trade_data = [{'Time': t.transaction_time.strftime('%Y-%m-%d %H:%M'), 'Symbol': t.symbol, 'Side': t.side, 'Qty': float(t.qty), 'Price': f"${float(t.price):,}"} for t in trades]
+        trades_df = pd.DataFrame(trade_data)
+        st.dataframe(trades_df, use_container_width=True)
+    else:
+        st.info("No recent trades found.")
+
+except Exception as e:
+    st.error(f"Could not connect to Alpaca or fetch account data. Error: {e}")
+
+
+# --- STRATEGY BACKTESTER ---
+st.header("Strategy Backtester")
+
+with st.expander("About the Adaptive Momentum Strategy"):
+    st.markdown("""
+    This strategy is a **trend-following system** designed to adapt to different market regimes. It uses a long-term moving average to identify the overall trend.
+    **Core Logic:**
+    - **Regime Filter:** A 200-day simple moving average (SMA) determines the market "regime."
+    - **Buffer Zone:** A 2% buffer is applied above and below the 200-day SMA to create a neutral zone. This helps prevent "whipsaws" (bad trades) during choppy, non-trending periods.
+    **Trading Rules:**
+    1.  **Buy Signal (Risk-On):** A position is entered only if the price moves **more than 2% above** the 200-day SMA.
+    2.  **Sell Signal (Risk-Off):** The position is sold only if the price drops **more than 2% below** the 200-day SMA.
+    3.  **Hold:** If the price is within the +/- 2% buffer zone, the strategy holds its current position.
+    """)
+    
+st.write("Enter a stock ticker to backtest the strategy.")
+symbol = st.text_input("Stock Ticker (e.g., AAPL, MSFT, SPY)", "NVDA", key="backtest_symbol").upper()
+
+if st.button("Run Backtest"):
+    if symbol:
+        with st.spinner(f"Running backtest for {symbol}..."):
+            results, chart_figure = run_backtest_for_dashboard(
+                symbol=symbol, start_date='2015-01-01', end_date='2025-06-09', config=tiingo_config
+            )
+        if results:
+            st.success(f"Backtest for {symbol} complete!")
+            col1, col2 = st.columns(2)
+            col1.metric("Buy & Hold Return", results["buy_and_hold"])
+            col2.metric("Strategy Return", results["strategy"])
+            st.pyplot(chart_figure)
         else:
-            st.warning("Please enter a stock ticker.")
+            st.error(f"Could not retrieve data or run backtest for {symbol}.")
+    else:
+        st.warning("Please enter a stock ticker.")
