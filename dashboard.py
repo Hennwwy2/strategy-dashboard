@@ -7,14 +7,13 @@ import alpaca_trade_api as tradeapi
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 
-# --- We will add debug lines to this function ---
 def run_backtest_for_dashboard(symbol, start_date, end_date, config, regime_window=200):
     try:
         client = TiingoClient(config)
         data = client.get_dataframe(symbol, frequency='daily', startDate=start_date, endDate=end_date)
         data.rename(columns={'adjClose': 'Adj Close'}, inplace=True)
         if data.empty:
-            return None, None
+            return None, "No data returned from Tiingo."
     except Exception as e:
         return None, str(e)
 
@@ -32,19 +31,10 @@ def run_backtest_for_dashboard(symbol, start_date, end_date, config, regime_wind
             data['signal'][i] = data['signal'][i-1]
     data['signal'] = data['signal'].shift(1)
 
-    # --- NEW TEMPORARY DEBUGGING SECTION ---
-    # This will print info to the app for each stock as it's being tested.
-    st.info(f"--- Debug Info for {symbol} ---")
-    st.write("Columns in DataFrame:", data.columns.tolist())
-    st.write("First 5 rows of data:")
-    st.dataframe(data.head())
-    st.write("--- End Debug Info ---")
-    # --- END DEBUGGING SECTION ---
-
     data['daily_return'] = data['Adj Close'].pct_change()
     data['strategy_return'] = data['daily_return'] * data['signal']
     data['buy_hold_cumulative'] = (1 + data['daily_return']).cumprod()
-    data['strategy_cumulative'] = (1 + data['strategy_return']).cumprod() # This is where the error happens
+    data['strategy_cumulative'] = (1 + data['strategy_return']).cumprod()
     data.dropna(inplace=True)
 
     buy_hold_return = (data['buy_hold_cumulative'].iloc[-1] - 1) * 100
@@ -58,10 +48,10 @@ def run_backtest_for_dashboard(symbol, start_date, end_date, config, regime_wind
     ax1.set_ylabel('Cumulative Return')
     ax1.legend()
     ax1.grid(True)
-    
+
     return results, fig
 
-# --- STREAMLIT WEB APPLICATION (No changes needed below this line) ---
+# --- STREAMLIT WEB APPLICATION ---
 st.set_page_config(layout="wide")
 st.title("Quantitative Trading Dashboard")
 
@@ -83,7 +73,6 @@ tab_live, tab_backtest = st.tabs(["Live Account Dashboard", "Strategy Backtester
 
 with tab_live:
     st.header("Live Alpaca Account Status")
-    # ... (code is the same)
     try:
         base_url = 'https://paper-api.alpaca.markets'
         api = tradeapi.REST(alpaca_key_id, alpaca_secret_key, base_url, api_version='v2')
@@ -148,21 +137,21 @@ with tab_live:
 with tab_backtest:
     st.header("Individual Strategy Backtester")
     with st.expander("About the Adaptive Momentum Strategy"):
-        st.markdown("...")
+        st.markdown("""...""")
     st.write("Enter a stock ticker to backtest the strategy.")
     symbol = st.text_input("Stock Ticker", "NVDA", key="backtest_symbol").upper()
     if st.button("Run Single Backtest"):
         if symbol:
             with st.spinner(f"Running backtest for {symbol}..."):
-                results, chart_figure = run_backtest_for_dashboard(symbol=symbol, start_date='2015-01-01', end_date='2025-06-09', config=tiingo_config)
-            if results and chart_figure:
+                results, fig_or_error = run_backtest_for_dashboard(symbol=symbol, start_date='2015-01-01', end_date='2025-06-09', config=tiingo_config)
+            if results:
                 st.success(f"Backtest for {symbol} complete!")
                 col1, col2 = st.columns(2)
                 col1.metric("Buy & Hold Return", results["buy_and_hold"])
                 col2.metric("Strategy Return", results["strategy"])
-                st.pyplot(chart_figure)
+                st.pyplot(fig_or_error)
             else:
-                st.error(f"Could not retrieve data or run backtest. Error: {chart_figure}")
+                st.error(f"Could not retrieve data or run backtest. Error: {fig_or_error}")
         else:
             st.warning("Please enter a stock ticker.")
     st.divider()
