@@ -4,9 +4,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from tiingo import TiingoClient
 import alpaca_trade_api as tradeapi
+import plotly.graph_objects as go # Import the new Plotly library
+from datetime import datetime, timedelta
 
 # --- Backtesting function (no changes needed here) ---
 def run_backtest_for_dashboard(symbol, start_date, end_date, config, regime_window=200):
+    # ... (This function is the same as before) ...
     try:
         client = TiingoClient(config)
         data = client.get_dataframe(symbol, frequency='daily', startDate=start_date, endDate=end_date)
@@ -91,12 +94,42 @@ with tab_live:
             pos_data = [{'Symbol': p.symbol, 'Qty': float(p.qty), 'Market Value': f"${float(p.market_value):,}", 'Current Price': f"${float(p.current_price):,}", 'Unrealized P/L': f"${float(p.unrealized_pl):,}"} for p in positions]
             positions_df = pd.DataFrame(pos_data)
             st.dataframe(positions_df, use_container_width=True)
+
+            # --- NEW: INTERACTIVE STOCK CHART SECTION ---
+            st.subheader("Position Chart")
+            position_symbols = [p.symbol for p in positions]
+            selected_symbol = st.selectbox("Choose a stock to chart:", position_symbols)
+
+            if selected_symbol:
+                # Fetch 1 year of data for the chart
+                chart_start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
+                chart_end_date = datetime.now().strftime('%Y-%m-%d')
+                
+                chart_df = TiingoClient(tiingo_config).get_dataframe(
+                    selected_symbol, 
+                    frequency='daily', 
+                    startDate=chart_start_date, 
+                    endDate=chart_end_date
+                )
+                
+                # Create Plotly candlestick chart
+                fig = go.Figure(data=[go.Candlestick(x=chart_df.index,
+                                open=chart_df['open'],
+                                high=chart_df['high'],
+                                low=chart_df['low'],
+                                close=chart_df['close'])])
+                
+                fig.update_layout(
+                    title=f'{selected_symbol} - 1 Year Price Chart',
+                    yaxis_title='Price (USD)',
+                    xaxis_rangeslider_visible=False # Hide the bottom slider
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
         else:
             st.info("You have no open positions.")
 
-        # This is the corrected line for fetching trades, using 'FILL'
         trades = api.get_activities(activity_types='FILL', direction='desc')[:20]
-        
         if trades:
             st.subheader("Recent Trades")
             trade_data = [{'Time': t.transaction_time.strftime('%Y-%m-%d %H:%M'), 'Symbol': t.symbol, 'Side': t.side, 'Qty': float(t.qty), 'Price': f"${float(t.price):,}"} for t in trades]
@@ -111,6 +144,7 @@ with tab_live:
 # --- Content for the Second Tab ---
 with tab_backtest:
     st.header("Strategy Backtester")
+    # ... (The rest of the backtester code is the same as before) ...
     with st.expander("About the Adaptive Momentum Strategy"):
         st.markdown("""
         This strategy is a **trend-following system** designed to adapt to different market regimes. It uses a long-term moving average to identify the overall trend.
