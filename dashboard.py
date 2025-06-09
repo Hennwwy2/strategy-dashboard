@@ -1,3 +1,4 @@
+# --- FINAL VERSION ---
 import streamlit as st
 import configparser
 import pandas as pd
@@ -9,7 +10,6 @@ from datetime import datetime, timedelta
 
 # --- Backtesting function (no changes needed here) ---
 def run_backtest_for_dashboard(symbol, start_date, end_date, config, regime_window=200):
-    # ... (This function is the same as before) ...
     try:
         client = TiingoClient(config)
         data = client.get_dataframe(symbol, frequency='daily', startDate=start_date, endDate=end_date)
@@ -71,7 +71,7 @@ except:
     alpaca_secret_key = config['alpaca']['secret_key']
 
 tiingo_config = {'api_key': tiingo_key, 'session': True}
-tiingo_client = TiingoClient(tiingo_config) # Instantiate Tiingo client once
+tiingo_client = TiingoClient(tiingo_config)
 
 # --- Define the Tabs ---
 tab_live, tab_backtest = st.tabs(["Live Account Dashboard", "Strategy Backtester"])
@@ -89,31 +89,28 @@ with tab_live:
         col2.metric("Buying Power", f"${float(account.buying_power):,}")
         col3.metric("Account Status", account.status)
 
-        # --- NEW: LIVE QUOTE BY TICKER ---
+        st.divider()
+
+        # --- LIVE QUOTE BY TICKER ---
         st.subheader("Live Quote by Ticker")
-        col1_quote, col2_quote = st.columns([1, 3]) # Create columns for layout
+        col1_quote, col2_quote = st.columns([1, 3])
 
         with col1_quote:
             quote_symbol = st.text_input("Enter ticker:", "NVDA", key="live_quote_symbol").upper()
             if st.button("Get Live Quote"):
                 with st.spinner(f"Getting quote for {quote_symbol}..."):
-                    # Use get_ticker_price for the latest quote
                     quote_data = tiingo_client.get_ticker_price(quote_symbol)
-                    st.write("DEBUG: Raw data from Tiingo:", quote_data) # Add this line
                     if quote_data:
-                        # The API returns a list, we want the first item
                         latest = quote_data[0]
-                        price = latest['last']
-                        prev_close = latest['prevClose']
-                        change = price - prev_close
-                        change_percent = (change / prev_close) * 100
-                        
-                        # Store result in session state to display it in the other column
+                        price = latest['adjClose']
+                        open_price = latest['adjOpen']
+                        change = price - open_price
+                        change_percent = (change / open_price) * 100
                         st.session_state.quote_result = {
                             "symbol": quote_symbol,
                             "price": f"${price:,.2f}",
                             "delta": f"${change:,.2f} ({change_percent:.2f}%)",
-                            "timestamp": pd.to_datetime(latest['timestamp']).strftime('%Y-%m-%d %H:%M:%S %Z')
+                            "timestamp": pd.to_datetime(latest['date']).strftime('%Y-%m-%d')
                         }
                     else:
                         st.session_state.quote_result = None
@@ -123,17 +120,29 @@ with tab_live:
             if "quote_result" in st.session_state and st.session_state.quote_result:
                 res = st.session_state.quote_result
                 st.metric(label=f"Last Price for {res['symbol']}", value=res["price"], delta=res["delta"])
-                st.caption(f"Timestamp: {res['timestamp']}")
+                st.caption(f"Based on intraday change from open. Date: {res['timestamp']}")
         
-        st.divider() # Add a horizontal line for separation
+        st.divider()
 
-        # --- Existing Positions and Trades Tables ---
+        # --- Positions and Trades Tables ---
         positions = api.list_positions()
         if positions:
             st.subheader("Current Positions")
             pos_data = [{'Symbol': p.symbol, 'Qty': float(p.qty), 'Market Value': f"${float(p.market_value):,}", 'Current Price': f"${float(p.current_price):,}", 'Unrealized P/L': f"${float(p.unrealized_pl):,}"} for p in positions]
             positions_df = pd.DataFrame(pos_data)
             st.dataframe(positions_df, use_container_width=True)
+
+            # Interactive Stock Chart Section
+            st.subheader("Position Chart")
+            position_symbols = [p.symbol for p in positions]
+            selected_symbol = st.selectbox("Choose a stock to chart:", position_symbols)
+            if selected_symbol:
+                chart_start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
+                chart_end_date = datetime.now().strftime('%Y-%m-%d')
+                chart_df = tiingo_client.get_dataframe(selected_symbol, frequency='daily', startDate=chart_start_date, endDate=chart_end_date)
+                fig = go.Figure(data=[go.Candlestick(x=chart_df.index, open=chart_df['open'], high=chart_df['high'], low=chart_df['low'], close=chart_df['close'])])
+                fig.update_layout(title=f'{selected_symbol} - 1 Year Price Chart', yaxis_title='Price (USD)', xaxis_rangeslider_visible=False)
+                st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("You have no open positions.")
 
@@ -149,11 +158,9 @@ with tab_live:
     except Exception as e:
         st.error(f"Could not connect to Alpaca or fetch account data. Error: {e}")
 
-
 # --- Content for the Second Tab ---
 with tab_backtest:
     st.header("Strategy Backtester")
-    # ... (The rest of the backtester code is the same as before) ...
     with st.expander("About the Adaptive Momentum Strategy"):
         st.markdown("""
         This strategy is a **trend-following system** designed to adapt to different market regimes. It uses a long-term moving average to identify the overall trend.
