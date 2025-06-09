@@ -195,7 +195,10 @@ with tab_live:
             for p in positions:
                 try:
                     asset = api.get_asset(p.symbol)
-                    if hasattr(asset, 'class') and asset.class == 'us_option':
+                    # Check if this is an options position
+                    # Using getattr to safely access the class attribute
+                    asset_class = getattr(asset, 'class', None)
+                    if asset_class == 'us_option':
                         # This is an options position
                         quote = api.get_latest_quote(p.symbol)
                         options_positions.append({
