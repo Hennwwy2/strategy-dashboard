@@ -4,7 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from tiingo import TiingoClient
 import alpaca_trade_api as tradeapi
-import plotly.graph_objects as go # Import the new Plotly library
+import plotly.graph_objects as go
 from datetime import datetime, timedelta
 
 # --- Backtesting function (no changes needed here) ---
@@ -71,6 +71,7 @@ except:
     alpaca_secret_key = config['alpaca']['secret_key']
 
 tiingo_config = {'api_key': tiingo_key, 'session': True}
+tiingo_client = TiingoClient(tiingo_config) # Instantiate Tiingo client once
 
 # --- Define the Tabs ---
 tab_live, tab_backtest = st.tabs(["Live Account Dashboard", "Strategy Backtester"])
@@ -88,44 +89,50 @@ with tab_live:
         col2.metric("Buying Power", f"${float(account.buying_power):,}")
         col3.metric("Account Status", account.status)
 
+        # --- NEW: LIVE QUOTE BY TICKER ---
+        st.subheader("Live Quote by Ticker")
+        col1_quote, col2_quote = st.columns([1, 3]) # Create columns for layout
+
+        with col1_quote:
+            quote_symbol = st.text_input("Enter ticker:", "NVDA", key="live_quote_symbol").upper()
+            if st.button("Get Live Quote"):
+                with st.spinner(f"Getting quote for {quote_symbol}..."):
+                    # Use get_ticker_price for the latest quote
+                    quote_data = tiingo_client.get_ticker_price(quote_symbol)
+                    if quote_data:
+                        # The API returns a list, we want the first item
+                        latest = quote_data[0]
+                        price = latest['last']
+                        prev_close = latest['prevClose']
+                        change = price - prev_close
+                        change_percent = (change / prev_close) * 100
+                        
+                        # Store result in session state to display it in the other column
+                        st.session_state.quote_result = {
+                            "symbol": quote_symbol,
+                            "price": f"${price:,.2f}",
+                            "delta": f"${change:,.2f} ({change_percent:.2f}%)",
+                            "timestamp": pd.to_datetime(latest['timestamp']).strftime('%Y-%m-%d %H:%M:%S %Z')
+                        }
+                    else:
+                        st.session_state.quote_result = None
+                        st.error("Could not retrieve quote.")
+        
+        with col2_quote:
+            if "quote_result" in st.session_state and st.session_state.quote_result:
+                res = st.session_state.quote_result
+                st.metric(label=f"Last Price for {res['symbol']}", value=res["price"], delta=res["delta"])
+                st.caption(f"Timestamp: {res['timestamp']}")
+        
+        st.divider() # Add a horizontal line for separation
+
+        # --- Existing Positions and Trades Tables ---
         positions = api.list_positions()
         if positions:
             st.subheader("Current Positions")
             pos_data = [{'Symbol': p.symbol, 'Qty': float(p.qty), 'Market Value': f"${float(p.market_value):,}", 'Current Price': f"${float(p.current_price):,}", 'Unrealized P/L': f"${float(p.unrealized_pl):,}"} for p in positions]
             positions_df = pd.DataFrame(pos_data)
             st.dataframe(positions_df, use_container_width=True)
-
-            # --- NEW: INTERACTIVE STOCK CHART SECTION ---
-            st.subheader("Position Chart")
-            position_symbols = [p.symbol for p in positions]
-            selected_symbol = st.selectbox("Choose a stock to chart:", position_symbols)
-
-            if selected_symbol:
-                # Fetch 1 year of data for the chart
-                chart_start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
-                chart_end_date = datetime.now().strftime('%Y-%m-%d')
-                
-                chart_df = TiingoClient(tiingo_config).get_dataframe(
-                    selected_symbol, 
-                    frequency='daily', 
-                    startDate=chart_start_date, 
-                    endDate=chart_end_date
-                )
-                
-                # Create Plotly candlestick chart
-                fig = go.Figure(data=[go.Candlestick(x=chart_df.index,
-                                open=chart_df['open'],
-                                high=chart_df['high'],
-                                low=chart_df['low'],
-                                close=chart_df['close'])])
-                
-                fig.update_layout(
-                    title=f'{selected_symbol} - 1 Year Price Chart',
-                    yaxis_title='Price (USD)',
-                    xaxis_rangeslider_visible=False # Hide the bottom slider
-                )
-                st.plotly_chart(fig, use_container_width=True)
-
         else:
             st.info("You have no open positions.")
 
@@ -140,6 +147,7 @@ with tab_live:
 
     except Exception as e:
         st.error(f"Could not connect to Alpaca or fetch account data. Error: {e}")
+
 
 # --- Content for the Second Tab ---
 with tab_backtest:
