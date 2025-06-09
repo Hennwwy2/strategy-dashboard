@@ -4,7 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from tiingo import TiingoClient
 
-# This is our main backtesting function from before
+# This is our main backtesting function
 def run_backtest_for_dashboard(symbol, start_date, end_date, config, regime_window=200):
     try:
         client = TiingoClient(config)
@@ -55,7 +55,6 @@ def run_backtest_for_dashboard(symbol, start_date, end_date, config, regime_wind
 st.set_page_config(layout="wide")
 st.title("Quantitative Strategy Backtesting Dashboard")
 
-# This code correctly reads secrets for deployment and falls back to config.ini for local use
 try:
     tiingo_key = st.secrets["tiingo"]["api_key"]
 except:
