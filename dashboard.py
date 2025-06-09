@@ -99,6 +99,7 @@ with tab_live:
                 with st.spinner(f"Getting quote for {quote_symbol}..."):
                     # Use get_ticker_price for the latest quote
                     quote_data = tiingo_client.get_ticker_price(quote_symbol)
+                    st.write("DEBUG: Raw data from Tiingo:", quote_data) # Add this line
                     if quote_data:
                         # The API returns a list, we want the first item
                         latest = quote_data[0]
