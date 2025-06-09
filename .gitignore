@@ -1,0 +1,8 @@
+# Ignore the configuration file containing our secret keys
+config.ini
+
+# Ignore the virtual environment folder (if you use one)
+venv/
+
+# Ignore Python's cache folder
+__pycache__/
