@@ -48,7 +48,7 @@ def run_backtest_for_dashboard(symbol, start_date, end_date, config, regime_wind
     ax1.set_ylabel('Cumulative Return')
     ax1.legend()
     ax1.grid(True)
-
+    
     return results, fig
 
 # --- STREAMLIT WEB APPLICATION ---
@@ -72,6 +72,7 @@ tiingo_client = TiingoClient(tiingo_config)
 tab_live, tab_backtest = st.tabs(["Live Account Dashboard", "Strategy Backtester"])
 
 with tab_live:
+    # ... (Live Dashboard code is unchanged) ...
     st.header("Live Alpaca Account Status")
     try:
         base_url = 'https://paper-api.alpaca.markets'
@@ -136,10 +137,25 @@ with tab_live:
 
 with tab_backtest:
     st.header("Individual Strategy Backtester")
+    
+    # This is the corrected block with the full description
     with st.expander("About the Adaptive Momentum Strategy"):
-        st.markdown("""...""")
+        st.markdown("""
+        This strategy is a **trend-following system** designed to adapt to different market regimes. It uses a long-term moving average to identify the overall trend.
+
+        **Core Logic:**
+        - **Regime Filter:** A 200-day simple moving average (SMA) determines the market "regime."
+        - **Buffer Zone:** A 2% buffer is applied above and below the 200-day SMA to create a neutral zone. This helps prevent "whipsaws" (bad trades) during choppy, non-trending periods.
+        
+        **Trading Rules:**
+        1.  **Buy Signal (Risk-On):** A position is entered only if the price moves **more than 2% above** the 200-day SMA.
+        2.  **Sell Signal (Risk-Off):** The position is sold only if the price drops **more than 2% below** the 200-day SMA.
+        3.  **Hold:** If the price is within the +/- 2% buffer zone, the strategy holds its current position.
+        """)
+    
     st.write("Enter a stock ticker to backtest the strategy.")
     symbol = st.text_input("Stock Ticker", "NVDA", key="backtest_symbol").upper()
+
     if st.button("Run Single Backtest"):
         if symbol:
             with st.spinner(f"Running backtest for {symbol}..."):
@@ -154,11 +170,14 @@ with tab_backtest:
                 st.error(f"Could not retrieve data or run backtest. Error: {fig_or_error}")
         else:
             st.warning("Please enter a stock ticker.")
+    
     st.divider()
+
     st.header("Batch Test on Recommended Stocks")
     st.write("Click the button below to run the backtest on a curated list of historically trending stocks.")
     recommended_tickers = ["AAPL", "MSFT", "AMZN", "META", "TSLA"]
     st.write("Recommended Tickers:", ", ".join(recommended_tickers))
+
     if st.button("Run Batch Backtest"):
         batch_results = []
         results_placeholder = st.empty()
