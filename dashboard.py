@@ -52,7 +52,7 @@ def run_backtest_for_dashboard(symbol, start_date, end_date, config, regime_wind
     return results, fig
 
 # --- STREAMLIT WEB APPLICATION ---
-st.set_page_config(layout="wide")
+st.set_page_config(layout="wide", initial_sidebar_state="collapsed")
 st.title("Quantitative Trading Dashboard")
 
 try:
