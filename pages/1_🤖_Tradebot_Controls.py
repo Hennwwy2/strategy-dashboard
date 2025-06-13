@@ -99,6 +99,18 @@ class PaperTradingDB:
         conn.close()
         return result[0] if result else 0
     
+    def get_positions(self):
+        """Get all current positions with error handling"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            df = pd.read_sql_query('SELECT * FROM positions WHERE quantity != 0', conn)
+            conn.close()
+            return df
+        except Exception as e:
+            # Return empty dataframe if table doesn't exist or other error
+            print(f"Error getting positions: {e}")
+            return pd.DataFrame(columns=['id', 'symbol', 'quantity', 'avg_price', 'position_type', 'created_at'])
+    
     def add_trade(self, symbol, quantity, price, side, trade_type='stock'):
         """Add a trade to the database"""
         conn = sqlite3.connect(self.db_path)
@@ -472,6 +484,8 @@ if st.session_state.authenticated:
         if not positions.empty:
             st.write("**Current Positions:**")
             st.dataframe(positions[['symbol', 'quantity', 'avg_price', 'position_type']], use_container_width=True)
+        else:
+            st.info("No open positions")
         
     except Exception as e:
         st.error(f"Could not load account info: {e}")
