@@ -2,7 +2,7 @@
 
 # IMPORTANT: st.set_page_config MUST be the first Streamlit command
 import streamlit as st
-st.set_page_config(layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(layout="wide", initial_sidebar_state="auto")
 
 import configparser
 import pandas as pd
