@@ -61,7 +61,7 @@ class PaperTradingDB:
         self.init_db()
     
     def init_db(self):
-        """Initialize database tables"""
+        """Initialize database tables with migration support"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -91,6 +91,29 @@ class PaperTradingDB:
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        
+        # Migrate existing tables to add new columns if they don't exist
+        try:
+            # Check if strategy_type column exists in trades table
+            cursor.execute("PRAGMA table_info(trades)")
+            columns = [column[1] for column in cursor.fetchall()]
+            
+            if 'strategy_type' not in columns:
+                cursor.execute('ALTER TABLE trades ADD COLUMN strategy_type TEXT DEFAULT "momentum"')
+                print("✅ Added strategy_type column to trades table")
+        except Exception as e:
+            print(f"Migration warning: {e}")
+        
+        try:
+            # Check if strategy_type column exists in positions table
+            cursor.execute("PRAGMA table_info(positions)")
+            columns = [column[1] for column in cursor.fetchall()]
+            
+            if 'strategy_type' not in columns:
+                cursor.execute('ALTER TABLE positions ADD COLUMN strategy_type TEXT DEFAULT "momentum"')
+                print("✅ Added strategy_type column to positions table")
+        except Exception as e:
+            print(f"Migration warning: {e}")
         
         # Create volatility tracking table
         cursor.execute('''
