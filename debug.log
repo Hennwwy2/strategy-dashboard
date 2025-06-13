@@ -228,3 +228,13 @@
 2025-06-12 21:53:10,035 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
 2025-06-12 21:53:10,115 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v2/last/trade/AAPL?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 403 177
 2025-06-12 21:53:10,116 - TradingDashboard - INFO - Completed function: get_quote in 0:00:00.082799
+2025-06-12 22:15:58,027 - TradingDashboard - INFO - Starting function: init_db
+2025-06-12 22:15:58,028 - TradingDashboard - INFO - Completed function: init_db in 0:00:00.001288
+2025-06-12 22:15:58,033 - TradingDashboard - INFO - Starting function: get_account_info
+2025-06-12 22:15:58,034 - TradingDashboard - INFO - Completed function: get_account_info in 0:00:00.001665
+2025-06-12 22:15:58,035 - TradingDashboard - INFO - Starting function: get_positions
+2025-06-12 22:15:58,037 - TradingDashboard - INFO - Completed function: get_positions in 0:00:00.002557
+2025-06-12 22:15:58,056 - TradingDashboard - INFO - Starting function: get_quote
+2025-06-12 22:15:58,057 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 22:15:58,280 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v2/last/trade/AAPL?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 403 177
+2025-06-12 22:15:58,281 - TradingDashboard - INFO - Completed function: get_quote in 0:00:00.225542
