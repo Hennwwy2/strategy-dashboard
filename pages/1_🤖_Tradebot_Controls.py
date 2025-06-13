@@ -649,7 +649,8 @@ if st.session_state.authenticated:
                 
             st.subheader("Momentum Strategy Log:")
             log_text = "\n".join(returned_logs)
-            st.code(log_text, language=None)
+            # Create a much larger text area for better readability
+            st.text_area("Strategy Output", log_text, height=400, disabled=True)
             
             st.session_state.last_momentum_run = datetime.now()
             st.session_state.last_momentum_logs = returned_logs
@@ -667,8 +668,8 @@ if st.session_state.authenticated:
                 
             st.subheader("Volatility Arbitrage Log:")
             log_text = "\n".join(returned_logs)
-            # Make the log container taller and more readable
-            st.code(log_text, language=None, line_numbers=False)
+            # Create a much larger text area for the volatility arbitrage logs
+            st.text_area("Volatility Analysis Output", log_text, height=500, disabled=True)
             
             st.session_state.last_vol_arb_run = datetime.now()
             st.session_state.last_vol_arb_logs = returned_logs
@@ -690,8 +691,8 @@ if st.session_state.authenticated:
                 
             st.subheader("Combined Strategy Log:")
             log_text = "\n".join(combined_logs)
-            # Make combined log even taller since it has more content
-            st.code(log_text, language=None, line_numbers=False)
+            # Create an even larger text area for combined logs
+            st.text_area("Combined Strategy Output", log_text, height=600, disabled=True)
             
             st.session_state.last_combined_run = datetime.now()
     
