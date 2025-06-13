@@ -307,22 +307,153 @@ def create_ml_options_tab(polygon_api, tiingo_client):
     # Initialize ML system
     ml_system = OptionsStrategyML(polygon_api, tiingo_client)
     
+    # Curated stock lists based on volatility profiles
+    stock_categories = {
+        "🔥 High Volatility Stocks": {
+            "description": "High-growth, high-volatility stocks perfect for options strategies",
+            "stocks": ["NVDA", "TSLA", "AMD", "SMCI", "PLTR", "ROKU", "COIN", "MSTR", "DKNG", "ARKK"]
+        },
+        "⚖️ Medium Volatility Stocks": {
+            "description": "Growth stocks with moderate volatility - balanced risk/reward",
+            "stocks": ["AAPL", "MSFT", "GOOGL", "META", "AMZN", "NFLX", "CRM", "UBER", "SHOP", "SQ"]
+        },
+        "🛡️ Low Volatility Stocks": {
+            "description": "Stable, dividend-paying stocks good for income strategies", 
+            "stocks": ["SPY", "QQQ", "KO", "JNJ", "PG", "WMT", "VZ", "T", "PFE", "XOM"]
+        },
+        "📊 Sector ETFs": {
+            "description": "Diversified sector exposure with varying volatility",
+            "stocks": ["XLK", "XLF", "XLE", "XLV", "XLI", "XLY", "XLP", "XLU", "XLRE", "XLB"]
+        }
+    }
+    
     # User inputs
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns([2, 1])
     
     with col1:
-        symbol = st.text_input("Stock Symbol:", "NVDA").upper()
+        st.subheader("📈 Stock Selection")
+        
+        # Stock category selector
+        selected_category = st.selectbox(
+            "Choose stock category:",
+            list(stock_categories.keys()),
+            help="Select based on your risk tolerance and strategy preference"
+        )
+        
+        # Show category description
+        category_info = stock_categories[selected_category]
+        st.info(f"**{selected_category}**: {category_info['description']}")
+        
+        # Stock selector within category
+        col1a, col1b = st.columns([2, 1])
+        
+        with col1a:
+            symbol = st.selectbox(
+                "Select stock:",
+                category_info['stocks'],
+                help="Pre-selected stocks known for their volatility characteristics"
+            )
+        
+        with col1b:
+            # Option to add custom symbol
+            custom_symbol = st.text_input("Or enter custom symbol:", placeholder="e.g., AAPL")
+            if custom_symbol:
+                symbol = custom_symbol.upper()
+        
+        # Display current selection
+        st.success(f"**Selected Symbol**: {symbol}")
+        
+        # Quick volatility info for selected stock
+        volatility_info = {
+            # High volatility
+            "NVDA": "🔥 High volatility AI chip leader",
+            "TSLA": "🔥 High volatility EV pioneer", 
+            "AMD": "🔥 High volatility semiconductor",
+            "SMCI": "🔥 Extremely high volatility AI infrastructure",
+            "PLTR": "🔥 High volatility data analytics",
+            "ROKU": "🔥 High volatility streaming",
+            "COIN": "🔥 Extreme volatility crypto exchange",
+            "MSTR": "🔥 Extreme volatility Bitcoin proxy",
+            "DKNG": "🔥 High volatility gaming",
+            "ARKK": "🔥 High volatility innovation ETF",
+            
+            # Medium volatility  
+            "AAPL": "⚖️ Medium volatility tech giant",
+            "MSFT": "⚖️ Medium volatility cloud leader",
+            "GOOGL": "⚖️ Medium volatility search/AI",
+            "META": "⚖️ Medium volatility social media",
+            "AMZN": "⚖️ Medium volatility e-commerce/cloud",
+            "NFLX": "⚖️ Medium volatility streaming leader",
+            "CRM": "⚖️ Medium volatility enterprise software",
+            "UBER": "⚖️ Medium volatility ride-sharing",
+            "SHOP": "⚖️ Medium volatility e-commerce platform",
+            "SQ": "⚖️ Medium volatility fintech",
+            
+            # Low volatility
+            "SPY": "🛡️ Low volatility S&P 500 ETF",
+            "QQQ": "🛡️ Low-medium volatility Nasdaq ETF",
+            "KO": "🛡️ Low volatility dividend aristocrat",
+            "JNJ": "🛡️ Low volatility healthcare giant",
+            "PG": "🛡️ Low volatility consumer staples",
+            "WMT": "🛡️ Low volatility retail giant", 
+            "VZ": "🛡️ Low volatility telecom dividend",
+            "T": "🛡️ Low volatility telecom",
+            "PFE": "🛡️ Low volatility pharma",
+            "XOM": "🛡️ Medium volatility energy giant",
+        }
+        
+        if symbol in volatility_info:
+            st.caption(volatility_info[symbol])
     
     with col2:
+        st.subheader("⚙️ Analysis Settings")
+        
         analysis_period = st.selectbox("Analysis Period:", ["6 Months", "1 Year", "2 Years"])
         days_map = {"6 Months": 180, "1 Year": 365, "2 Years": 730}
         days = days_map[analysis_period]
-    
-    with col3:
+        
         ml_mode = st.selectbox(
             "Analysis Mode:", 
             ["Quick Analysis", "Full ML Training", "Strategy Comparison"]
         )
+        
+        # Quick tips based on selected category
+        if "High Volatility" in selected_category:
+            st.success("💡 **High Vol Tips:**\n- Great for straddles/strangles\n- Consider selling premium\n- Watch for earnings events")
+        elif "Medium Volatility" in selected_category:
+            st.info("💡 **Medium Vol Tips:**\n- Balanced approach works\n- Good for covered calls\n- Directional plays viable")
+        elif "Low Volatility" in selected_category:
+            st.warning("💡 **Low Vol Tips:**\n- Focus on income strategies\n- Buy options cheaply\n- Avoid selling premium")
+    
+    # Quick volatility comparison chart
+    if st.checkbox("📊 Show Volatility Comparison", value=False):
+        st.subheader("Volatility Profile Comparison")
+        
+        # Sample historical volatilities (you could make this dynamic)
+        vol_data = {
+            "Stock": ["MSTR", "COIN", "TSLA", "NVDA", "AAPL", "MSFT", "SPY", "KO"],
+            "Avg_Volatility": [95, 85, 65, 55, 25, 22, 15, 12],
+            "Category": ["🔥 Extreme", "🔥 High", "🔥 High", "🔥 High", "⚖️ Medium", "⚖️ Medium", "🛡️ Low", "🛡️ Low"]
+        }
+        
+        vol_df = pd.DataFrame(vol_data)
+        
+        fig_vol = px.bar(
+            vol_df, 
+            x="Stock", 
+            y="Avg_Volatility",
+            color="Category",
+            title="Historical Volatility Comparison (%)",
+            color_discrete_map={
+                "🔥 Extreme": "#ff4444",
+                "🔥 High": "#ff8800", 
+                "⚖️ Medium": "#0088ff",
+                "🛡️ Low": "#00aa44"
+            }
+        )
+        
+        fig_vol.update_layout(height=400)
+        st.plotly_chart(fig_vol, use_container_width=True)
     
     if st.button("🚀 Analyze Options Strategies", type="primary"):
         if symbol:
