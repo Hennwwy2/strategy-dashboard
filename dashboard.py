@@ -464,10 +464,29 @@ try:
     polygon_key = st.secrets["polygon"]["api_key"]
 except:
     # Fall back to config file
-    config = configparser.ConfigParser()
-    config.read('config.ini')
-    tiingo_key = config['tiingo']['api_key']
-    polygon_key = config['polygon']['api_key']
+    try:
+        config = configparser.ConfigParser()
+        config.read('config.ini')
+        tiingo_key = config.get('tiingo', 'api_key', fallback='YOUR_TIINGO_API_KEY_HERE')
+        polygon_key = config.get('polygon', 'api_key', fallback='YOUR_POLYGON_API_KEY_HERE')
+    except Exception as e:
+        st.error(f"Configuration error: {e}")
+        st.info("Please make sure your config.ini file has the correct format:")
+        st.code("""[tiingo]
+api_key = your_tiingo_key_here
+
+[polygon]
+api_key = your_polygon_key_here""")
+        st.stop()
+
+# Check if we have valid API keys
+if tiingo_key == 'YOUR_TIINGO_API_KEY_HERE':
+    st.error("⚠️ Please update your Tiingo API key in config.ini")
+    st.stop()
+
+if polygon_key == 'YOUR_POLYGON_API_KEY_HERE':
+    st.error("⚠️ Please update your Polygon API key in config.ini")
+    st.stop()
 
 tiingo_config = {'api_key': tiingo_key, 'session': True}
 tiingo_client = TiingoClient(tiingo_config)
