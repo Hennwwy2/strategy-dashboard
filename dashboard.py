@@ -1,15 +1,175 @@
-# --- COMPLETE ENHANCED DASHBOARD WITH OPTIONS SUPPORT ---
+# --- COMPLETE ENHANCED DASHBOARD WITH POLYGON INTEGRATION ---
 import streamlit as st
 import configparser
 import pandas as pd
 import matplotlib.pyplot as plt
 from tiingo import TiingoClient
-import alpaca_trade_api as tradeapi
+import requests
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import math
 import numpy as np
-import random
+import json
+import sqlite3
+import os
+
+# Polygon API wrapper class
+class PolygonAPI:
+    def __init__(self, api_key):
+        self.api_key = api_key
+        self.base_url = "https://api.polygon.io"
+        
+    def get_quote(self, symbol):
+        """Get real-time quote"""
+        url = f"{self.base_url}/v2/last/trade/{symbol}"
+        params = {"apikey": self.api_key}
+        response = requests.get(url, params=params)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            st.error(f"Error fetching quote: {response.status_code}")
+            return None
+    
+    def get_options_chain(self, underlying_symbol, expiration_date=None):
+        """Get options chain for a symbol"""
+        # Get options contracts
+        url = f"{self.base_url}/v3/reference/options/contracts"
+        params = {
+            "underlying_ticker": underlying_symbol,
+            "apikey": self.api_key,
+            "limit": 1000
+        }
+        
+        if expiration_date:
+            params["expiration_date"] = expiration_date
+            
+        response = requests.get(url, params=params)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            st.error(f"Error fetching options: {response.status_code}")
+            return None
+    
+    def get_options_quotes(self, options_ticker):
+        """Get options quote"""
+        url = f"{self.base_url}/v3/last/trade/options/{options_ticker}"
+        params = {"apikey": self.api_key}
+        response = requests.get(url, params=params)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            return None
+
+# Paper Trading Database Manager
+class PaperTradingDB:
+    def __init__(self, db_path="paper_trading.db"):
+        self.db_path = db_path
+        self.init_db()
+    
+    def init_db(self):
+        """Initialize database tables"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # Create positions table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS positions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                symbol TEXT NOT NULL,
+                quantity REAL NOT NULL,
+                avg_price REAL NOT NULL,
+                position_type TEXT NOT NULL, -- 'stock' or 'option'
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Create trades table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS trades (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                symbol TEXT NOT NULL,
+                quantity REAL NOT NULL,
+                price REAL NOT NULL,
+                side TEXT NOT NULL, -- 'buy' or 'sell'
+                trade_type TEXT NOT NULL, -- 'stock' or 'option'
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Create account table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS account (
+                id INTEGER PRIMARY KEY,
+                cash REAL NOT NULL,
+                portfolio_value REAL NOT NULL,
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Initialize account with $100,000 if not exists
+        cursor.execute('SELECT COUNT(*) FROM account')
+        if cursor.fetchone()[0] == 0:
+            cursor.execute('INSERT INTO account (id, cash, portfolio_value) VALUES (1, 100000, 100000)')
+        
+        conn.commit()
+        conn.close()
+    
+    def get_positions(self):
+        """Get all current positions"""
+        conn = sqlite3.connect(self.db_path)
+        df = pd.read_sql_query('SELECT * FROM positions WHERE quantity != 0', conn)
+        conn.close()
+        return df
+    
+    def get_account_info(self):
+        """Get account information"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('SELECT cash, portfolio_value FROM account WHERE id = 1')
+        result = cursor.fetchone()
+        conn.close()
+        return {"cash": result[0], "portfolio_value": result[1]} if result else {"cash": 100000, "portfolio_value": 100000}
+    
+    def add_trade(self, symbol, quantity, price, side, trade_type='stock'):
+        """Add a trade to the database"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # Add trade to trades table
+        cursor.execute('''
+            INSERT INTO trades (symbol, quantity, price, side, trade_type)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (symbol, quantity, price, side, trade_type))
+        
+        # Update positions
+        cursor.execute('SELECT quantity, avg_price FROM positions WHERE symbol = ?', (symbol,))
+        existing = cursor.fetchone()
+        
+        if existing:
+            existing_qty, existing_avg = existing
+            if side == 'buy':
+                new_qty = existing_qty + quantity
+                new_avg = ((existing_qty * existing_avg) + (quantity * price)) / new_qty
+            else:  # sell
+                new_qty = existing_qty - quantity
+                new_avg = existing_avg  # Keep same average price
+            
+            cursor.execute('''
+                UPDATE positions SET quantity = ?, avg_price = ? WHERE symbol = ?
+            ''', (new_qty, new_avg, symbol))
+        else:
+            if side == 'buy':
+                cursor.execute('''
+                    INSERT INTO positions (symbol, quantity, avg_price, position_type)
+                    VALUES (?, ?, ?, ?)
+                ''', (symbol, quantity, price, trade_type))
+        
+        # Update cash
+        cash_change = -quantity * price if side == 'buy' else quantity * price
+        cursor.execute('UPDATE account SET cash = cash + ? WHERE id = 1', (cash_change,))
+        
+        conn.commit()
+        conn.close()
 
 def run_backtest_for_dashboard(symbol, start_date, end_date, config, regime_window=200):
     """Original backtest function - unchanged"""
@@ -56,117 +216,94 @@ def run_backtest_for_dashboard(symbol, start_date, end_date, config, regime_wind
     
     return results, fig
 
-def get_options_chain(api, symbol):
-    """Get options chain for a symbol"""
-    try:
-        # Note: Alpaca's options API may require additional setup or permissions
-        # This is a simplified version that handles the current API
-        
-        # For now, return empty list with informative message
-        # In production, you'd need to check if options trading is enabled
-        # and use the correct API endpoints
-        
-        st.warning("""
-        📝 **Options Chain Note**: 
-        
-        To view options chains, ensure:
-        1. Your Alpaca account has options trading enabled
-        2. You're using the correct API version
-        3. You have the necessary permissions
-        
-        Contact Alpaca support if you need help enabling options trading.
-        """)
-        
-        return []
-        
-    except Exception as e:
-        st.error(f"Error fetching options chain: {e}")
-        return []
-
-def display_options_chain(api, symbol):
-    """Display options chain in a formatted table"""
+def display_options_chain(polygon_api, symbol):
+    """Display options chain using Polygon data"""
     st.subheader(f"Options Chain for {symbol}")
     
     # Get current stock price
     try:
-        quote = api.get_latest_trade(symbol)
-        current_price = quote.price
-        st.metric("Current Stock Price", f"${current_price:.2f}")
+        quote_data = polygon_api.get_quote(symbol)
+        if quote_data and 'results' in quote_data:
+            current_price = quote_data['results']['p']
+            st.metric("Current Stock Price", f"${current_price:.2f}")
+        else:
+            current_price = 100.0  # Fallback
+            st.warning("Could not fetch current price, using fallback")
     except:
-        current_price = None
+        current_price = 100.0
         st.warning("Could not fetch current price")
     
-    # Check if options are available
-    contracts = get_options_chain(api, symbol)
+    # Get options chain
+    with st.spinner("Loading options chain..."):
+        options_data = polygon_api.get_options_chain(symbol)
     
-    if not contracts:
-        # Provide alternative options information
-        st.info("💡 **Options Trading Alternatives:**")
+    if options_data and 'results' in options_data:
+        options = options_data['results']
         
-        col1, col2 = st.columns(2)
+        if not options:
+            st.info("No options data available for this symbol")
+            return
         
-        with col1:
-            st.write("**While options chain loads, you can:**")
-            st.write("• Use the Options Simulator to practice")
-            st.write("• Review your current positions")
-            st.write("• Learn about options strategies")
-            st.write("• Check if options trading is enabled on your account")
+        # Process options data
+        calls = []
+        puts = []
         
-        with col2:
-            st.write("**Popular Options Platforms:**")
-            st.write("• [Alpaca Options Docs](https://alpaca.markets/docs/trading/options-trading/)")
-            st.write("• [CBOE Options Chain](https://www.cboe.com/)")
-            st.write("• [Yahoo Finance Options](https://finance.yahoo.com/)")
-            
-        # Show mock data for educational purposes
-        with st.expander("📚 Example Options Chain (Educational)"):
-            st.write(f"**Example options chain for {symbol} at ${current_price:.2f}:**")
-            
-            # Create sample data
-            sample_calls = []
-            sample_puts = []
-            
-            for i in range(-2, 3):
-                strike = round(current_price * (1 + i * 0.05), 2)
+        for option in options[:50]:  # Limit to first 50 for performance
+            try:
+                contract_type = option.get('contract_type', 'unknown')
+                strike = option.get('strike_price', 0)
+                expiration = option.get('expiration_date', '')
                 
-                # Calls
-                call_premium = max(0.5, (current_price - strike) + 2) if current_price > strike else max(0.5, 2 - abs(current_price - strike) * 0.1)
-                sample_calls.append({
-                    'Strike': f"${strike}",
-                    'Bid': f"${call_premium - 0.1:.2f}",
-                    'Ask': f"${call_premium + 0.1:.2f}",
-                    'Volume': np.random.randint(10, 500),
-                    'Open Interest': np.random.randint(100, 5000)
-                })
+                # Get option quote
+                option_ticker = option.get('ticker', '')
+                quote = polygon_api.get_options_quotes(option_ticker)
                 
-                # Puts
-                put_premium = max(0.5, (strike - current_price) + 2) if strike > current_price else max(0.5, 2 - abs(current_price - strike) * 0.1)
-                sample_puts.append({
+                if quote and 'results' in quote:
+                    price = quote['results'].get('p', 0)
+                    size = quote['results'].get('s', 0)
+                else:
+                    price = 0
+                    size = 0
+                
+                option_data = {
                     'Strike': f"${strike}",
-                    'Bid': f"${put_premium - 0.1:.2f}",
-                    'Ask': f"${put_premium + 0.1:.2f}",
-                    'Volume': np.random.randint(10, 500),
-                    'Open Interest': np.random.randint(100, 5000)
-                })
-            
+                    'Expiration': expiration,
+                    'Last Price': f"${price:.2f}",
+                    'Size': size,
+                    'Ticker': option_ticker
+                }
+                
+                if contract_type == 'call':
+                    calls.append(option_data)
+                elif contract_type == 'put':
+                    puts.append(option_data)
+                    
+            except Exception as e:
+                continue
+        
+        # Display in tabs
+        if calls or puts:
             call_tab, put_tab = st.tabs(["📈 Calls", "📉 Puts"])
             
             with call_tab:
-                st.write("**Call Options** (Right to Buy)")
-                df_calls = pd.DataFrame(sample_calls)
-                st.dataframe(df_calls, use_container_width=True)
-                st.caption("💡 Calls profit when stock price rises above strike + premium")
+                if calls:
+                    st.write("**Call Options** (Right to Buy)")
+                    df_calls = pd.DataFrame(calls)
+                    st.dataframe(df_calls, use_container_width=True)
+                else:
+                    st.info("No call options data available")
             
             with put_tab:
-                st.write("**Put Options** (Right to Sell)")
-                df_puts = pd.DataFrame(sample_puts)
-                st.dataframe(df_puts, use_container_width=True)
-                st.caption("💡 Puts profit when stock price falls below strike - premium")
-        
-        return
-    
-    # Original code for when options are available
-    # ... rest of the function remains the same ...
+                if puts:
+                    st.write("**Put Options** (Right to Sell)")
+                    df_puts = pd.DataFrame(puts)
+                    st.dataframe(df_puts, use_container_width=True)
+                else:
+                    st.info("No put options data available")
+        else:
+            st.info("No options data could be processed")
+    else:
+        st.error("Failed to fetch options chain")
 
 def create_payoff_diagram(option_type, strike, premium, current_price, is_buyer=True):
     """Create visual payoff diagram for options"""
@@ -249,11 +386,13 @@ def options_simulator():
             help="Pick a stock you're familiar with"
         )
         
-        # Try to get real price, fall back to mock prices if API fails
+        # Try to get real price from Polygon
         try:
-            api = tradeapi.REST(alpaca_key_id, alpaca_secret_key, base_url, api_version='v2')
-            quote = api.get_latest_trade(stock_symbol)
-            current_price = float(quote.price)
+            quote_data = polygon_api.get_quote(stock_symbol)
+            if quote_data and 'results' in quote_data:
+                current_price = float(quote_data['results']['p'])
+            else:
+                raise Exception("No data")
         except:
             # Fallback mock prices
             current_prices = {"AAPL": 185.50, "NVDA": 140.25, "TSLA": 175.80, "SPY": 440.50}
@@ -316,121 +455,118 @@ def options_simulator():
 
 # --- STREAMLIT WEB APPLICATION ---
 st.set_page_config(layout="wide", initial_sidebar_state="collapsed")
-st.title("Quantitative Trading Dashboard - Stocks & Options")
+st.title("Polygon-Based Trading Dashboard - Stocks & Options")
 
+# Initialize APIs
 try:
+    # Try to get from Streamlit secrets first
     tiingo_key = st.secrets["tiingo"]["api_key"]
-    alpaca_key_id = st.secrets["alpaca"]["api_key_id"]
-    alpaca_secret_key = st.secrets["alpaca"]["secret_key"]
+    polygon_key = st.secrets["polygon"]["api_key"]
 except:
+    # Fall back to config file
     config = configparser.ConfigParser()
     config.read('config.ini')
     tiingo_key = config['tiingo']['api_key']
-    alpaca_key_id = config['alpaca']['api_key_id']
-    alpaca_secret_key = config['alpaca']['secret_key']
+    polygon_key = config['polygon']['api_key']
 
 tiingo_config = {'api_key': tiingo_key, 'session': True}
 tiingo_client = TiingoClient(tiingo_config)
+polygon_api = PolygonAPI(polygon_key)
+paper_db = PaperTradingDB()
 
 # Create tabs for different sections
 tab_live, tab_options, tab_backtest = st.tabs(["📊 Live Account", "🎯 Options Trading", "📈 Strategy Backtester"])
 
 with tab_live:
-    st.header("Live Alpaca Account Status")
-    try:
-        base_url = 'https://paper-api.alpaca.markets'
-        api = tradeapi.REST(alpaca_key_id, alpaca_secret_key, base_url, api_version='v2')
-        account = api.get_account()
-        
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Portfolio Value", f"${float(account.portfolio_value):,}")
-        col2.metric("Buying Power", f"${float(account.buying_power):,}")
-        col3.metric("Account Status", account.status)
-        
-        st.divider()
-        
-        # Enhanced positions display - now includes options
-        positions = api.list_positions()
-        if positions:
-            st.subheader("Current Positions")
-            
-            stock_positions = []
-            options_positions = []
-            
-            for p in positions:
-                try:
-                    asset = api.get_asset(p.symbol)
-                    # Check if this is an options position
-                    # Using getattr to safely access the class attribute
-                    asset_class = getattr(asset, 'class', None)
-                    if asset_class == 'us_option':
-                        # This is an options position
-                        quote = api.get_latest_quote(p.symbol)
-                        
-                        # Parse option details from symbol
-                        # Format: AAPL230120C00150000
-                        underlying = p.symbol[:4]  # First 4 chars
-                        option_type = 'Call' if 'C' in p.symbol else 'Put'
-                        
-                        options_positions.append({
-                            'Symbol': p.symbol,
-                            'Underlying': underlying,
-                            'Type': option_type,
-                            'Qty': float(p.qty),
-                            'Avg Cost': f"${float(p.avg_entry_price):.2f}",
-                            'Current': f"${float(quote.ask_price):.2f}" if quote.ask_price else "N/A",
-                            'Market Value': f"${float(p.market_value):,}",
-                            'P/L': f"${float(p.unrealized_pl):,}"
-                        })
-                    else:
-                        # Regular stock position
-                        stock_positions.append({
-                            'Symbol': p.symbol,
-                            'Qty': float(p.qty),
-                            'Market Value': f"${float(p.market_value):,}",
-                            'Current Price': f"${float(p.current_price):,}",
-                            'Unrealized P/L': f"${float(p.unrealized_pl):,}"
-                        })
-                except:
-                    continue
-            
-            if stock_positions:
-                st.write("**📈 Stock Positions:**")
-                st.dataframe(pd.DataFrame(stock_positions), use_container_width=True)
-            
-            if options_positions:
-                st.write("**🎯 Options Positions:**")
-                st.dataframe(pd.DataFrame(options_positions), use_container_width=True)
+    st.header("Live Account Status")
+    
+    # Get account info
+    account_info = paper_db.get_account_info()
+    positions = paper_db.get_positions()
+    
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Cash Balance", f"${account_info['cash']:,.2f}")
+    col2.metric("Portfolio Value", f"${account_info['portfolio_value']:,.2f}")
+    col3.metric("Account Type", "Live Trading")
+    
+    st.divider()
+    
+    # Current positions
+    st.subheader("Current Positions")
+    if not positions.empty:
+        # Get current prices for positions
+        position_data = []
+        for _, pos in positions.iterrows():
+            try:
+                quote_data = polygon_api.get_quote(pos['symbol'])
+                if quote_data and 'results' in quote_data:
+                    current_price = quote_data['results']['p']
+                    market_value = pos['quantity'] * current_price
+                    unrealized_pnl = (current_price - pos['avg_price']) * pos['quantity']
+                else:
+                    current_price = pos['avg_price']
+                    market_value = pos['quantity'] * current_price
+                    unrealized_pnl = 0
                 
-                # Options position analysis
-                with st.expander("Options Position Analysis"):
-                    for opt in options_positions:
-                        st.write(f"**{opt['Symbol']}**")
-                        st.write(f"- Type: {opt['Type']} Option")
-                        st.write(f"- Contracts: {opt['Qty']}")
-                        st.write(f"- P/L: {opt['P/L']}")
-        else:
-            st.info("You have no open positions.")
-        
-        # Recent trades section
-        st.divider()
-        trades = api.get_activities(activity_types='FILL', direction='desc')[:20]
-        if trades:
-            st.subheader("Recent Trades")
-            trade_data = []
-            for t in trades:
-                trade_data.append({
-                    'Time': t.transaction_time.strftime('%Y-%m-%d %H:%M'),
-                    'Symbol': t.symbol,
-                    'Side': t.side,
-                    'Qty': float(t.qty),
-                    'Price': f"${float(t.price):,}"
+                position_data.append({
+                    'Symbol': pos['symbol'],
+                    'Quantity': pos['quantity'],
+                    'Avg Price': f"${pos['avg_price']:.2f}",
+                    'Current Price': f"${current_price:.2f}",
+                    'Market Value': f"${market_value:.2f}",
+                    'Unrealized P/L': f"${unrealized_pnl:.2f}",
+                    'Type': pos['position_type']
                 })
-            trades_df = pd.DataFrame(trade_data)
-            st.dataframe(trades_df, use_container_width=True)
+            except:
+                position_data.append({
+                    'Symbol': pos['symbol'],
+                    'Quantity': pos['quantity'],
+                    'Avg Price': f"${pos['avg_price']:.2f}",
+                    'Current Price': "N/A",
+                    'Market Value': "N/A",
+                    'Unrealized P/L': "N/A",
+                    'Type': pos['position_type']
+                })
         
-    except Exception as e:
-        st.error(f"Could not connect to Alpaca. Error: {e}")
+        if position_data:
+            df_positions = pd.DataFrame(position_data)
+            st.dataframe(df_positions, use_container_width=True)
+    else:
+        st.info("No open positions")
+    
+    # Simple trading interface
+    st.divider()
+    st.subheader("Place Live Trade")
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        trade_symbol = st.text_input("Symbol:", "NVDA").upper()
+    with col2:
+        trade_side = st.selectbox("Side:", ["buy", "sell"])
+    with col3:
+        trade_qty = st.number_input("Quantity:", min_value=1, value=10)
+    
+    if st.button("Get Quote & Place Trade"):
+        if trade_symbol:
+            try:
+                quote_data = polygon_api.get_quote(trade_symbol)
+                if quote_data and 'results' in quote_data:
+                    current_price = quote_data['results']['p']
+                    st.success(f"Current price for {trade_symbol}: ${current_price:.2f}")
+                    
+                    # Place the trade
+                    paper_db.add_trade(trade_symbol, trade_qty, current_price, trade_side)
+                    
+                    if trade_side == "buy":
+                        st.success(f"✅ Live trade executed: Bought {trade_qty} shares of {trade_symbol} at ${current_price:.2f}")
+                    else:
+                        st.success(f"✅ Live trade executed: Sold {trade_qty} shares of {trade_symbol} at ${current_price:.2f}")
+                    
+                    st.experimental_rerun()
+                else:
+                    st.error("Could not get quote for this symbol")
+            except Exception as e:
+                st.error(f"Error placing trade: {e}")
 
 with tab_options:
     st.header("🎯 Options Trading Center")
@@ -448,8 +584,7 @@ with tab_options:
         tabs = st.tabs([
             "📚 Learn Options", 
             "🎮 Practice Simulator", 
-            "📊 Options Chain",
-            "💼 My Positions"
+            "📊 Options Chain"
         ])
         
         with tabs[0]:
@@ -483,32 +618,18 @@ with tab_options:
         
         with tabs[2]:
             # Options chain
-            st.subheader("📊 Live Options Chain")
+            st.subheader("📊 Live Options Chain (Polygon Data)")
             chain_symbol = st.text_input("Enter symbol:", "NVDA", key="chain_symbol_beginner")
             if st.button("Load Options", key="load_chain_beginner"):
                 with st.spinner(f"Loading options for {chain_symbol}..."):
                     try:
-                        display_options_chain(api, chain_symbol)
+                        display_options_chain(polygon_api, chain_symbol)
                     except Exception as e:
                         st.error(f"Error: {e}")
-        
-        with tabs[3]:
-            # Current positions (same as in live tab but filtered for options)
-            st.subheader("💼 My Options Positions")
-            if options_positions:
-                st.dataframe(pd.DataFrame(options_positions), use_container_width=True)
-                
-                # Position helper
-                st.info("💡 **Position Management Tips:**")
-                st.write("• Consider closing positions when up 50%+")
-                st.write("• Set stop loss at 50% loss")
-                st.write("• Watch time decay - close before last week")
-            else:
-                st.info("No options positions yet. Try the simulator first!")
     
     else:
-        # Advanced mode - original interface
-        st.subheader("Options Chain Explorer")
+        # Advanced mode
+        st.subheader("Advanced Options Trading")
         
         col1, col2 = st.columns([3, 1])
         with col1:
@@ -521,195 +642,62 @@ with tab_options:
         if load_btn:
             with st.spinner(f"Loading options for {options_symbol}..."):
                 try:
-                    display_options_chain(api, options_symbol)
+                    display_options_chain(polygon_api, options_symbol)
                 except Exception as e:
                     st.error(f"Error loading options chain: {e}")
-        
-        # Greeks and advanced analysis
-        with st.expander("Advanced Options Analytics"):
-            st.write("**Greeks Analysis** (Coming Soon)")
-            st.write("• Delta: Direction exposure")
-            st.write("• Theta: Time decay")
-            st.write("• Vega: Volatility sensitivity")
-            st.write("• Gamma: Delta acceleration")
 
 with tab_backtest:
     st.header("Strategy Backtester")
+    st.info("📈 Backtesting still uses Tiingo data (more reliable historical data)")
     
-    # Strategy selector with options
-    strategy_type = st.selectbox(
-        "Select Strategy Type:",
-        ["Stock Momentum Strategy", "Options Strategy (Simulated)", "Compare Both"]
-    )
+    st.subheader("Adaptive Momentum Strategy Backtest")
     
-    if strategy_type == "Stock Momentum Strategy":
-        st.subheader("Adaptive Momentum Strategy Backtest")
-        
-        with st.expander("ℹ️ About the Strategy"):
-            st.markdown("""
-            **The Adaptive Momentum Strategy:**
-            - Uses 200-day moving average as trend filter
-            - Buys when price breaks 2% above MA
-            - Sells when price breaks 2% below MA
-            - Aims to capture major trends while avoiding whipsaws
-            """)
-        
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            symbol = st.text_input("Stock Ticker", "NVDA", key="backtest_symbol").upper()
-        with col2:
-            st.write("")  # Spacer
-            st.write("")  # Spacer
-            run_backtest = st.button("Run Backtest", type="primary")
-        
-        if run_backtest:
-            if symbol:
-                with st.spinner(f"Running backtest for {symbol}..."):
-                    results, fig_or_error = run_backtest_for_dashboard(
-                        symbol=symbol,
-                        start_date='2015-01-01',
-                        end_date='2025-06-09',
-                        config=tiingo_config
-                    )
-                if results:
-                    st.success(f"Backtest for {symbol} complete!")
-                    
-                    col1, col2, col3 = st.columns(3)
-                    col1.metric("Buy & Hold Return", results["buy_and_hold"])
-                    col2.metric("Strategy Return", results["strategy"])
-                    
-                    # Calculate outperformance
-                    bh_return = float(results["buy_and_hold"].strip('%'))
-                    strat_return = float(results["strategy"].strip('%'))
-                    outperformance = strat_return - bh_return
-                    
-                    col3.metric("Outperformance", f"{outperformance:.2f}%", 
-                               delta=f"{outperformance:.2f}%",
-                               delta_color="normal" if outperformance > 0 else "inverse")
-                    
-                    st.pyplot(fig_or_error)
-            else:
-                st.warning("Please enter a stock ticker.")
-        
-        # Batch backtester
-        st.divider()
-        st.subheader("Batch Backtester")
-        st.write("Test the strategy on multiple stocks at once:")
-        
-        recommended_tickers = ["AAPL", "MSFT", "AMZN", "META", "TSLA", "NVDA", "GOOGL", "NFLX"]
-        selected_tickers = st.multiselect(
-            "Select tickers to test:",
-            recommended_tickers,
-            default=recommended_tickers[:5]
-        )
-        
-        if st.button("Run Batch Backtest"):
-            if selected_tickers:
-                batch_results = []
-                progress_bar = st.progress(0)
+    with st.expander("ℹ️ About the Strategy"):
+        st.markdown("""
+        **The Adaptive Momentum Strategy:**
+        - Uses 200-day moving average as trend filter
+        - Buys when price breaks 2% above MA
+        - Sells when price breaks 2% below MA
+        - Aims to capture major trends while avoiding whipsaws
+        """)
+    
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        symbol = st.text_input("Stock Ticker", "NVDA", key="backtest_symbol").upper()
+    with col2:
+        st.write("")  # Spacer
+        st.write("")  # Spacer
+        run_backtest = st.button("Run Backtest", type="primary")
+    
+    if run_backtest:
+        if symbol:
+            with st.spinner(f"Running backtest for {symbol}..."):
+                results, fig_or_error = run_backtest_for_dashboard(
+                    symbol=symbol,
+                    start_date='2015-01-01',
+                    end_date='2025-06-09',
+                    config=tiingo_config
+                )
+            if results:
+                st.success(f"Backtest for {symbol} complete!")
                 
-                for i, ticker in enumerate(selected_tickers):
-                    with st.spinner(f"Testing {ticker}..."):
-                        results, fig = run_backtest_for_dashboard(
-                            symbol=ticker,
-                            start_date='2015-01-01',
-                            end_date='2025-06-09',
-                            config=tiingo_config
-                        )
-                        if results:
-                            bh_return = float(results["buy_and_hold"].strip('%'))
-                            strat_return = float(results["strategy"].strip('%'))
-                            batch_results.append({
-                                'Symbol': ticker,
-                                'Buy & Hold': results['buy_and_hold'],
-                                'Strategy': results['strategy'],
-                                'Outperformance': f"{strat_return - bh_return:.2f}%"
-                            })
-                        else:
-                            batch_results.append({
-                                'Symbol': ticker,
-                                'Buy & Hold': 'Error',
-                                'Strategy': 'Error',
-                                'Outperformance': 'N/A'
-                            })
-                    
-                    progress_bar.progress((i + 1) / len(selected_tickers))
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Buy & Hold Return", results["buy_and_hold"])
+                col2.metric("Strategy Return", results["strategy"])
                 
-                results_df = pd.DataFrame(batch_results)
-                st.dataframe(results_df, use_container_width=True)
+                # Calculate outperformance
+                bh_return = float(results["buy_and_hold"].strip('%'))
+                strat_return = float(results["strategy"].strip('%'))
+                outperformance = strat_return - bh_return
                 
-                # Summary statistics
-                successful_results = [r for r in batch_results if r['Buy & Hold'] != 'Error']
-                if successful_results:
-                    wins = sum(1 for r in successful_results if float(r['Outperformance'].strip('%')) > 0)
-                    win_rate = (wins / len(successful_results)) * 100
-                    
-                    col1, col2 = st.columns(2)
-                    col1.metric("Win Rate", f"{win_rate:.1f}%")
-                    col2.metric("Stocks Outperformed", f"{wins}/{len(successful_results)}")
-    
-    elif strategy_type == "Options Strategy (Simulated)":
-        st.info("⚠️ Options backtesting requires expensive historical data. This is a simplified simulation.")
-        
-        st.subheader("Options Strategy Simulator")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            option_strategy = st.selectbox(
-                "Select Options Strategy:",
-                ["Long Calls (Momentum)", "Long Puts (Hedge)", "Covered Calls (Income)"]
-            )
-            symbol = st.text_input("Stock Symbol:", "NVDA", key="options_backtest_symbol")
-        
-        with col2:
-            st.write("**Strategy Description:**")
-            if "Long Calls" in option_strategy:
-                st.write("Buy call options when momentum signal is bullish")
-                st.write("• Higher leverage than stocks")
-                st.write("• Limited downside risk")
-            elif "Long Puts" in option_strategy:
-                st.write("Buy puts as portfolio insurance")
-                st.write("• Protect against downturns")
-                st.write("• Profit from declines")
-            else:
-                st.write("Sell calls against stock holdings")
-                st.write("• Generate income")
-                st.write("• Cap upside potential")
-        
-        if st.button("Simulate Options Strategy"):
-            st.warning("This uses simplified assumptions - not real options prices")
-            
-            # Placeholder results
-            col1, col2, col3 = st.columns(3)
-            col1.metric("Simulated Return", "45.2%")
-            col2.metric("Max Drawdown", "-15.3%")
-            col3.metric("Win Rate", "62.5%")
-            
-            st.info("""
-            **Note on Options Backtesting:**
-            - Real options backtesting requires historical implied volatility
-            - Need bid-ask spread data
-            - Must account for early assignment risk
-            - Professional data sources: CBOE DataShop, ORATS, OptionMetrics
-            """)
-    
-    else:  # Compare Both
-        st.subheader("Strategy Comparison: Stocks vs Options")
-        st.info("Compare potential returns and risks between stock and options strategies")
-        
-        # This would show a side-by-side comparison
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.write("**Stock Strategy**")
-            st.write("✅ No expiration")
-            st.write("✅ Simple to execute")
-            st.write("❌ Requires more capital")
-            st.write("❌ Full downside exposure")
-        
-        with col2:
-            st.write("**Options Strategy**")
-            st.write("✅ Less capital required")
-            st.write("✅ Defined risk (when buying)")
-            st.write("❌ Time decay")
-            st.write("❌ More complex")
+                col3.metric("Outperformance", f"{outperformance:.2f}%", 
+                           delta=f"{outperformance:.2f}%",
+                           delta_color="normal" if outperformance > 0 else "inverse")
+                
+                st.pyplot(fig_or_error)
+        else:
+            st.warning("Please enter a stock ticker.")
+
+# Footer
+st.divider()
+st.caption("🔗 **Powered by Polygon.io** - Professional market data with paper trading simulation")
