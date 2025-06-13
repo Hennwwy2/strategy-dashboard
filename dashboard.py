@@ -13,6 +13,9 @@ import json
 import sqlite3
 import os
 
+# Import the ML options strategy module
+from ml_options_strategy import create_ml_options_tab
+
 # Import our AI debugging system
 from ai_debug_system import AIDebugSystem, create_debug_panel, integrate_ai_debugging, debug_wrapper
 
@@ -380,10 +383,11 @@ with col3:
     st.info(f"🛠️ Debug Mode: Active")
 
 # Create tabs for different sections
-tab_live, tab_options, tab_backtest, tab_debug = st.tabs([
+tab_live, tab_options, tab_backtest, tab_ml, tab_debug = st.tabs([
     "📊 Live Account", 
     "🎯 Options Trading", 
     "📈 Strategy Backtester",
+    "🧠 ML Strategy Finder",
     "🐛 Debug Console"
 ])
 
@@ -530,6 +534,9 @@ with tab_backtest:
                 except Exception as e:
                     # Error automatically handled by debug system
                     st.error(f"Backtest error: {e}")
+
+with tab_ml:
+    create_ml_options_tab(polygon_api, tiingo_client)
 
 with tab_debug:
     st.header("🐛 Advanced Debug Console")

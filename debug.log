@@ -1,0 +1,230 @@
+2025-06-12 21:52:45,908 - TradingDashboard - INFO - Starting function: init_db
+2025-06-12 21:52:45,942 - TradingDashboard - INFO - Completed function: init_db in 0:00:00.033499
+2025-06-12 21:52:45,945 - TradingDashboard - INFO - Starting function: get_account_info
+2025-06-12 21:52:45,948 - TradingDashboard - INFO - Completed function: get_account_info in 0:00:00.002592
+2025-06-12 21:52:45,948 - TradingDashboard - INFO - Starting function: get_positions
+2025-06-12 21:52:45,955 - TradingDashboard - INFO - Completed function: get_positions in 0:00:00.006624
+2025-06-12 21:52:45,974 - TradingDashboard - INFO - Starting function: get_quote
+2025-06-12 21:52:45,976 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:52:46,193 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v2/last/trade/AAPL?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 403 177
+2025-06-12 21:52:46,194 - TradingDashboard - INFO - Completed function: get_quote in 0:00:00.219760
+2025-06-12 21:53:05,957 - TradingDashboard - INFO - Starting function: init_db
+2025-06-12 21:53:05,959 - TradingDashboard - INFO - Completed function: init_db in 0:00:00.002245
+2025-06-12 21:53:05,963 - TradingDashboard - INFO - Starting function: get_account_info
+2025-06-12 21:53:05,965 - TradingDashboard - INFO - Completed function: get_account_info in 0:00:00.001975
+2025-06-12 21:53:05,966 - TradingDashboard - INFO - Starting function: get_positions
+2025-06-12 21:53:05,968 - TradingDashboard - INFO - Completed function: get_positions in 0:00:00.002664
+2025-06-12 21:53:05,977 - TradingDashboard - INFO - Starting function: display_options_chain
+2025-06-12 21:53:05,978 - TradingDashboard - INFO - Starting function: get_quote
+2025-06-12 21:53:05,979 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:06,057 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v2/last/trade/NVDA?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 403 177
+2025-06-12 21:53:06,058 - TradingDashboard - INFO - Completed function: get_quote in 0:00:00.080285
+2025-06-12 21:53:06,060 - TradingDashboard - INFO - Starting function: get_options_chain
+2025-06-12 21:53:06,061 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:06,211 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/reference/options/contracts?underlying_ticker=NVDA&apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT&limit=1000 HTTP/1.1" 200 None
+2025-06-12 21:53:06,215 - TradingDashboard - INFO - Completed function: get_options_chain in 0:00:00.155479
+2025-06-12 21:53:06,216 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:06,217 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:06,291 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00010000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:06,292 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.075589
+2025-06-12 21:53:06,292 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:06,293 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:06,366 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00015000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:06,366 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.074260
+2025-06-12 21:53:06,367 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:06,368 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:06,440 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00020000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:06,440 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.073897
+2025-06-12 21:53:06,441 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:06,442 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:06,514 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00025000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:06,515 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.074016
+2025-06-12 21:53:06,515 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:06,516 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:06,586 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00030000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:06,587 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.071671
+2025-06-12 21:53:06,587 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:06,589 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:06,660 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00035000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:06,662 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.074366
+2025-06-12 21:53:06,662 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:06,663 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:06,737 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00040000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:06,737 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.075562
+2025-06-12 21:53:06,738 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:06,739 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:06,810 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00045000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:06,811 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.073259
+2025-06-12 21:53:06,811 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:06,812 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:06,885 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00050000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:06,886 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.074225
+2025-06-12 21:53:06,886 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:06,887 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:06,957 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00055000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:06,958 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.071927
+2025-06-12 21:53:06,958 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:06,959 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:07,034 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00060000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:07,035 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.076917
+2025-06-12 21:53:07,035 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:07,036 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:07,108 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00065000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:07,108 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.072896
+2025-06-12 21:53:07,108 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:07,109 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:07,179 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00070000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:07,180 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.071172
+2025-06-12 21:53:07,180 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:07,181 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:07,250 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00075000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:07,251 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.071063
+2025-06-12 21:53:07,251 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:07,252 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:07,323 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00080000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:07,324 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.072772
+2025-06-12 21:53:07,324 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:07,325 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:07,397 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00085000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:07,398 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.073655
+2025-06-12 21:53:07,398 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:07,399 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:07,467 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00090000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:07,468 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.069271
+2025-06-12 21:53:07,468 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:07,469 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:07,538 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00093000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:07,539 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.070998
+2025-06-12 21:53:07,539 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:07,540 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:07,611 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00094000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:07,611 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.072025
+2025-06-12 21:53:07,612 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:07,613 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:07,682 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00095000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:07,682 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.070955
+2025-06-12 21:53:07,683 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:07,684 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:07,752 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00096000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:07,752 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.069521
+2025-06-12 21:53:07,753 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:07,754 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:07,826 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00097000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:07,826 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.073908
+2025-06-12 21:53:07,827 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:07,828 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:07,900 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00098000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:07,901 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.073893
+2025-06-12 21:53:07,901 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:07,902 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:07,970 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00099000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:07,971 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.070276
+2025-06-12 21:53:07,971 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:07,973 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:08,043 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00100000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:08,044 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.072487
+2025-06-12 21:53:08,044 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:08,045 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:08,114 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00101000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:08,115 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.070641
+2025-06-12 21:53:08,115 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:08,116 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:08,186 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00102000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:08,187 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.071949
+2025-06-12 21:53:08,188 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:08,189 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:08,259 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00103000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:08,260 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.072761
+2025-06-12 21:53:08,261 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:08,262 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:08,335 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00104000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:08,336 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.075236
+2025-06-12 21:53:08,336 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:08,337 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:08,414 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00105000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:08,415 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.078458
+2025-06-12 21:53:08,415 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:08,416 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:08,485 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00106000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:08,486 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.071402
+2025-06-12 21:53:08,487 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:08,488 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:08,559 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00107000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:08,560 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.073509
+2025-06-12 21:53:08,560 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:08,561 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:08,633 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00108000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:08,634 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.073313
+2025-06-12 21:53:08,634 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:08,635 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:08,707 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00109000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:08,708 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.073513
+2025-06-12 21:53:08,708 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:08,709 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:08,780 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00110000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:08,781 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.073205
+2025-06-12 21:53:08,781 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:08,782 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:08,867 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00111000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:08,868 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.086558
+2025-06-12 21:53:08,868 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:08,869 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:09,064 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00112000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:09,065 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.196334
+2025-06-12 21:53:09,065 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:09,066 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:09,134 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00113000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:09,135 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.070350
+2025-06-12 21:53:09,135 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:09,136 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:09,207 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00114000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:09,208 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.072289
+2025-06-12 21:53:09,208 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:09,209 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:09,279 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00115000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:09,280 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.071914
+2025-06-12 21:53:09,280 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:09,281 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:09,350 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00116000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:09,351 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.070818
+2025-06-12 21:53:09,351 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:09,352 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:09,425 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00117000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:09,425 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.074147
+2025-06-12 21:53:09,426 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:09,426 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:09,511 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00118000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:09,512 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.086443
+2025-06-12 21:53:09,512 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:09,513 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:09,582 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00119000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:09,583 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.070454
+2025-06-12 21:53:09,583 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:09,584 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:09,654 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00120000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:09,655 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.072208
+2025-06-12 21:53:09,656 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:09,656 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:09,726 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00121000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:09,727 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.071374
+2025-06-12 21:53:09,727 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:09,728 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:09,800 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00122000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:09,800 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.073132
+2025-06-12 21:53:09,801 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:09,802 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:09,874 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00123000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:09,875 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.073968
+2025-06-12 21:53:09,875 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:09,876 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:09,946 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00124000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:09,947 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.071872
+2025-06-12 21:53:09,947 - TradingDashboard - INFO - Starting function: get_options_quotes
+2025-06-12 21:53:09,948 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:10,018 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v3/last/trade/options/O:NVDA250613C00125000?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 404 18
+2025-06-12 21:53:10,019 - TradingDashboard - INFO - Completed function: get_options_quotes in 0:00:00.072203
+2025-06-12 21:53:10,024 - TradingDashboard - INFO - Completed function: display_options_chain in 0:00:04.047123
+2025-06-12 21:53:10,033 - TradingDashboard - INFO - Starting function: get_quote
+2025-06-12 21:53:10,035 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.polygon.io:443
+2025-06-12 21:53:10,115 - urllib3.connectionpool - DEBUG - https://api.polygon.io:443 "GET /v2/last/trade/AAPL?apikey=8DtZky9a1Bd8zixhKng_TtAm231TsapT HTTP/1.1" 403 177
+2025-06-12 21:53:10,116 - TradingDashboard - INFO - Completed function: get_quote in 0:00:00.082799
