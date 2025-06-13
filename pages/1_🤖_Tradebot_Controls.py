@@ -649,7 +649,7 @@ if st.session_state.authenticated:
                 
             st.subheader("Momentum Strategy Log:")
             log_text = "\n".join(returned_logs)
-            st.code(log_text)
+            st.code(log_text, language=None)
             
             st.session_state.last_momentum_run = datetime.now()
             st.session_state.last_momentum_logs = returned_logs
@@ -667,7 +667,8 @@ if st.session_state.authenticated:
                 
             st.subheader("Volatility Arbitrage Log:")
             log_text = "\n".join(returned_logs)
-            st.code(log_text)
+            # Make the log container taller and more readable
+            st.code(log_text, language=None, line_numbers=False)
             
             st.session_state.last_vol_arb_run = datetime.now()
             st.session_state.last_vol_arb_logs = returned_logs
@@ -689,11 +690,12 @@ if st.session_state.authenticated:
                 
             st.subheader("Combined Strategy Log:")
             log_text = "\n".join(combined_logs)
-            st.code(log_text)
+            # Make combined log even taller since it has more content
+            st.code(log_text, language=None, line_numbers=False)
             
             st.session_state.last_combined_run = datetime.now()
     
-    # Account status
+    # Account status - Make it wider and more readable
     st.divider()
     st.subheader("📊 Enhanced Paper Trading Account")
     
@@ -701,16 +703,34 @@ if st.session_state.authenticated:
         paper_db = PaperTradingDB()
         account_info = paper_db.get_account_info()
         
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Cash Balance", f"${account_info['cash']:,.2f}")
-        col2.metric("Portfolio Value", f"${account_info['portfolio_value']:,.2f}")
-        col3.metric("Account Type", "Paper Trading")
-        col4.metric("Strategies", "Momentum + Vol Arb")
+        # Use wider columns and better formatting
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("💰 Cash Balance", f"${account_info['cash']:,.2f}")
+            st.metric("📊 Account Type", "Paper Trading")
+        with col2:
+            st.metric("📈 Portfolio Value", f"${account_info['portfolio_value']:,.2f}")
+            st.metric("🎯 Active Strategies", "Momentum + Vol Arbitrage")
+        
+        # Show P&L
+        total_value = account_info['cash'] + account_info['portfolio_value']
+        pnl = total_value - 100000  # Starting amount
+        pnl_pct = (pnl / 100000) * 100
+        
+        st.divider()
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("📊 Total Account Value", f"${total_value:,.2f}")
+        with col2:
+            st.metric("💹 Unrealized P&L", f"${pnl:,.2f}", f"{pnl_pct:+.2f}%")
+        with col3:
+            st.metric("🎲 Risk Level", "Moderate")
         
         # Show positions by strategy
         positions = paper_db.get_positions()
         if not positions.empty:
-            st.write("**Current Positions by Strategy:**")
+            st.divider()
+            st.write("**📋 Current Positions by Strategy:**")
             
             # Group by strategy type
             if 'strategy_type' in positions.columns:
@@ -718,42 +738,58 @@ if st.session_state.authenticated:
                 vol_arb_pos = positions[positions['strategy_type'] == 'vol_arbitrage']
                 
                 if not momentum_pos.empty:
-                    st.write("*Momentum Positions:*")
-                    st.dataframe(momentum_pos[['symbol', 'quantity', 'avg_price', 'position_type']], use_container_width=True)
+                    st.write("*📈 Momentum Strategy Positions:*")
+                    # Make the dataframe wider and more readable
+                    display_df = momentum_pos[['symbol', 'quantity', 'avg_price', 'position_type']].copy()
+                    display_df['avg_price'] = display_df['avg_price'].apply(lambda x: f"${x:.2f}")
+                    st.dataframe(display_df, use_container_width=True, height=200)
                 
                 if not vol_arb_pos.empty:
-                    st.write("*Volatility Arbitrage Positions:*")
-                    st.dataframe(vol_arb_pos[['symbol', 'quantity', 'avg_price', 'position_type']], use_container_width=True)
+                    st.write("*🔬 Volatility Arbitrage Positions:*")
+                    display_df = vol_arb_pos[['symbol', 'quantity', 'avg_price', 'position_type']].copy()
+                    display_df['avg_price'] = display_df['avg_price'].apply(lambda x: f"${x:.2f}")
+                    st.dataframe(display_df, use_container_width=True, height=200)
             else:
-                st.dataframe(positions[['symbol', 'quantity', 'avg_price', 'position_type']], use_container_width=True)
+                # Format the display dataframe for better readability
+                display_df = positions[['symbol', 'quantity', 'avg_price', 'position_type']].copy()
+                display_df['avg_price'] = display_df['avg_price'].apply(lambda x: f"${x:.2f}")
+                st.dataframe(display_df, use_container_width=True, height=300)
         else:
-            st.info("No open positions")
+            st.info("📝 No open positions - Ready for new opportunities!")
         
     except Exception as e:
         st.error(f"Could not load account info: {e}")
     
-    # Strategy status
+    # Strategy status - More organized layout
     st.divider()
-    st.subheader("⏰ Strategy Status")
+    st.subheader("⏰ Strategy Execution Status")
     
-    col1, col2, col3 = st.columns(3)
-    with col1:
+    # Create a more organized status display
+    status_col1, status_col2, status_col3 = st.columns(3)
+    
+    with status_col1:
+        st.write("**📈 Momentum Strategy**")
         if 'last_momentum_run' in st.session_state:
-            st.metric("Last Momentum Run", st.session_state.last_momentum_run.strftime("%H:%M:%S"))
+            last_run = st.session_state.last_momentum_run.strftime("%H:%M:%S")
+            st.success(f"✅ Last run: {last_run}")
         else:
-            st.metric("Last Momentum Run", "Never")
+            st.info("🔄 Never executed")
     
-    with col2:
+    with status_col2:
+        st.write("**🔬 Volatility Arbitrage**")
         if 'last_vol_arb_run' in st.session_state:
-            st.metric("Last Vol Arb Run", st.session_state.last_vol_arb_run.strftime("%H:%M:%S"))
+            last_run = st.session_state.last_vol_arb_run.strftime("%H:%M:%S")
+            st.success(f"✅ Last run: {last_run}")
         else:
-            st.metric("Last Vol Arb Run", "Never")
+            st.info("🔄 Never executed")
     
-    with col3:
+    with status_col3:
+        st.write("**🚀 Combined Strategy**")
         if 'last_combined_run' in st.session_state:
-            st.metric("Last Combined Run", st.session_state.last_combined_run.strftime("%H:%M:%S"))
+            last_run = st.session_state.last_combined_run.strftime("%H:%M:%S")
+            st.success(f"✅ Last run: {last_run}")
         else:
-            st.metric("Last Combined Run", "Never")
+            st.info("🔄 Never executed")
 
 elif password_guess != "":
     st.error("❌ Incorrect password. Access denied.")
