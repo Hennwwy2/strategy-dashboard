@@ -87,36 +87,81 @@ class OptionsStrategyML:
         """Calculate technical indicators for ML features"""
         df = data.copy()
         
-        # Price-based indicators
-        df['sma_20'] = df['close'].rolling(20).mean()
-        df['sma_50'] = df['close'].rolling(50).mean()
-        df['ema_12'] = df['close'].ewm(span=12).mean()
-        df['ema_26'] = df['close'].ewm(span=26).mean()
+        # Ensure we're working with the right column name
+        if 'close' not in df.columns and 'adjClose' in df.columns:
+            df['close'] = df['adjClose']
+        elif 'close' not in df.columns and 'Close' in df.columns:
+            df['close'] = df['Close']
+        
+        # Price-based indicators - fix the DataFrame assignment issue
+        try:
+            df['sma_20'] = df['close'].rolling(20).mean()
+            df['sma_50'] = df['close'].rolling(50).mean()
+            df['ema_12'] = df['close'].ewm(span=12).mean()
+            df['ema_26'] = df['close'].ewm(span=26).mean()
+        except Exception as e:
+            st.error(f"Error calculating moving averages: {e}")
+            # Fallback values
+            df['sma_20'] = df['close']
+            df['sma_50'] = df['close']
+            df['ema_12'] = df['close']
+            df['ema_26'] = df['close']
         
         # Volatility indicators
-        df['volatility_20'] = df['close'].pct_change().rolling(20).std() * np.sqrt(252)
-        df['volatility_5'] = df['close'].pct_change().rolling(5).std() * np.sqrt(252)
+        try:
+            returns = df['close'].pct_change()
+            df['volatility_20'] = returns.rolling(20).std() * np.sqrt(252)
+            df['volatility_5'] = returns.rolling(5).std() * np.sqrt(252)
+        except Exception as e:
+            st.error(f"Error calculating volatility: {e}")
+            df['volatility_20'] = 0.2  # Default volatility
+            df['volatility_5'] = 0.2
         
         # Momentum indicators
-        df['rsi'] = self.calculate_rsi(df['close'])
-        df['macd'] = df['ema_12'] - df['ema_26']
-        df['macd_signal'] = df['macd'].ewm(span=9).mean()
+        try:
+            df['rsi'] = self.calculate_rsi(df['close'])
+            df['macd'] = df['ema_12'] - df['ema_26']
+            df['macd_signal'] = df['macd'].ewm(span=9).mean()
+        except Exception as e:
+            st.error(f"Error calculating momentum indicators: {e}")
+            df['rsi'] = 50  # Neutral RSI
+            df['macd'] = 0
+            df['macd_signal'] = 0
         
         # Price position indicators
-        df['price_vs_sma20'] = (df['close'] - df['sma_20']) / df['sma_20']
-        df['price_vs_sma50'] = (df['close'] - df['sma_50']) / df['sma_50']
+        try:
+            df['price_vs_sma20'] = (df['close'] - df['sma_20']) / df['sma_20']
+            df['price_vs_sma50'] = (df['close'] - df['sma_50']) / df['sma_50']
+        except Exception as e:
+            st.error(f"Error calculating price positions: {e}")
+            df['price_vs_sma20'] = 0
+            df['price_vs_sma50'] = 0
         
         # Bollinger Bands
-        df['bb_middle'] = df['close'].rolling(20).mean()
-        bb_std = df['close'].rolling(20).std()
-        df['bb_upper'] = df['bb_middle'] + (bb_std * 2)
-        df['bb_lower'] = df['bb_middle'] - (bb_std * 2)
-        df['bb_position'] = (df['close'] - df['bb_lower']) / (df['bb_upper'] - df['bb_lower'])
+        try:
+            df['bb_middle'] = df['close'].rolling(20).mean()
+            bb_std = df['close'].rolling(20).std()
+            df['bb_upper'] = df['bb_middle'] + (bb_std * 2)
+            df['bb_lower'] = df['bb_middle'] - (bb_std * 2)
+            df['bb_position'] = (df['close'] - df['bb_lower']) / (df['bb_upper'] - df['bb_lower'])
+            
+            # Handle division by zero
+            df['bb_position'] = df['bb_position'].fillna(0.5)
+        except Exception as e:
+            st.error(f"Error calculating Bollinger Bands: {e}")
+            df['bb_middle'] = df['close']
+            df['bb_upper'] = df['close'] * 1.02
+            df['bb_lower'] = df['close'] * 0.98
+            df['bb_position'] = 0.5
         
         # Volume indicators (if available)
-        if 'volume' in df.columns:
-            df['volume_sma'] = df['volume'].rolling(20).mean()
-            df['volume_ratio'] = df['volume'] / df['volume_sma']
+        if 'volume' in df.columns and not df['volume'].isna().all():
+            try:
+                df['volume_sma'] = df['volume'].rolling(20).mean()
+                df['volume_ratio'] = df['volume'] / df['volume_sma']
+                df['volume_ratio'] = df['volume_ratio'].fillna(1.0)
+            except Exception as e:
+                df['volume_ratio'] = 1.0
         else:
             df['volume_ratio'] = 1.0
         
@@ -463,19 +508,50 @@ def create_ml_options_tab(polygon_api, tiingo_client):
                     end_date = datetime.now()
                     start_date = end_date - timedelta(days=days)
                     
-                    data = tiingo_client.get_dataframe(
-                        symbol,
-                        frequency='daily',
-                        startDate=start_date.strftime('%Y-%m-%d'),
-                        endDate=end_date.strftime('%Y-%m-%d')
-                    )
-                    
-                    if data.empty:
-                        st.error("No data available for this symbol")
+                    try:
+                        data = tiingo_client.get_dataframe(
+                            symbol,
+                            frequency='daily',
+                            startDate=start_date.strftime('%Y-%m-%d'),
+                            endDate=end_date.strftime('%Y-%m-%d')
+                        )
+                        
+                        if data.empty:
+                            st.error("No data available for this symbol")
+                            return
+                        
+                        # Debug: Show data structure
+                        st.write("**Data Structure Debug:**")
+                        st.write(f"Columns: {list(data.columns)}")
+                        st.write(f"Data shape: {data.shape}")
+                        st.write(f"First few rows:")
+                        st.dataframe(data.head(3))
+                        
+                    except Exception as e:
+                        st.error(f"Error fetching data for {symbol}: {e}")
                         return
                     
-                    # Rename columns for consistency
-                    data.rename(columns={'adjClose': 'close'}, inplace=True)
+                    # Rename columns for consistency - handle different possible column names
+                    column_mapping = {}
+                    if 'adjClose' in data.columns:
+                        column_mapping['adjClose'] = 'close'
+                    elif 'Close' in data.columns:
+                        column_mapping['Close'] = 'close'
+                    elif 'close' not in data.columns:
+                        # Try to find a price column
+                        possible_price_cols = ['price', 'last', 'adj_close', 'adjusted_close']
+                        for col in possible_price_cols:
+                            if col in data.columns:
+                                column_mapping[col] = 'close'
+                                break
+                    
+                    if column_mapping:
+                        data = data.rename(columns=column_mapping)
+                    
+                    # Verify we have a close column
+                    if 'close' not in data.columns:
+                        st.error(f"Could not find price data in columns: {list(data.columns)}")
+                        return
                     
                     # Create ML features
                     ml_data, feature_columns = ml_system.create_ml_features(data)
