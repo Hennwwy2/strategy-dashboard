@@ -1,6 +1,5 @@
-# ai_debug_system.py - Advanced AI Debugging System
+# ai_debug_system.py - Advanced AI Debugging System (Complete Version)
 import streamlit as st
-import anthropic
 import traceback
 import sys
 import logging
@@ -12,15 +11,34 @@ from contextlib import contextmanager
 import inspect
 import os
 
+# Conditional import for anthropic
+try:
+    import anthropic
+    ANTHROPIC_AVAILABLE = True
+except ImportError:
+    ANTHROPIC_AVAILABLE = False
+    class MockAnthropic:
+        def __init__(self, *args, **kwargs):
+            pass
+        def messages(self):
+            return self
+        def create(self, *args, **kwargs):
+            return type('MockResponse', (), {'content': [type('MockContent', (), {'text': 'Anthropic library not available'})()]})()
+    anthropic = MockAnthropic
+
 class AIDebugSystem:
     def __init__(self, claude_api_key=None):
         self.claude_api_key = claude_api_key or self._get_claude_key()
         self.client = None
-        if self.claude_api_key and self.claude_api_key != "your-claude-api-key":
+        self.anthropic_available = ANTHROPIC_AVAILABLE
+        
+        if ANTHROPIC_AVAILABLE and self.claude_api_key and self.claude_api_key != "your-claude-api-key":
             try:
                 self.client = anthropic.Anthropic(api_key=self.claude_api_key)
-            except:
-                st.warning("Claude API not available - debugging will work in offline mode")
+            except Exception as e:
+                st.warning(f"Claude API initialization failed: {e}")
+        elif not ANTHROPIC_AVAILABLE:
+            st.info("🤖 AI Debug running in offline mode. Install 'anthropic' package for full AI features.")
         
         self.debug_db = "debug_logs.db"
         self.setup_debug_database()
@@ -35,47 +53,54 @@ class AIDebugSystem:
     
     def setup_debug_database(self):
         """Setup SQLite database for debug logs"""
-        conn = sqlite3.connect(self.debug_db)
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS debug_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                error_type TEXT,
-                error_message TEXT,
-                traceback_info TEXT,
-                function_name TEXT,
-                context_data TEXT,
-                ai_diagnosis TEXT,
-                resolution_status TEXT DEFAULT 'open',
-                user_notes TEXT
-            )
-        ''')
-        
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS debug_sessions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_start TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                session_data TEXT,
-                ai_conversation TEXT
-            )
-        ''')
-        
-        conn.commit()
-        conn.close()
+        try:
+            conn = sqlite3.connect(self.debug_db)
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS debug_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    error_type TEXT,
+                    error_message TEXT,
+                    traceback_info TEXT,
+                    function_name TEXT,
+                    context_data TEXT,
+                    ai_diagnosis TEXT,
+                    resolution_status TEXT DEFAULT 'open',
+                    user_notes TEXT
+                )
+            ''')
+            
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS debug_sessions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_start TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    session_data TEXT,
+                    ai_conversation TEXT
+                )
+            ''')
+            
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            st.error(f"Failed to setup debug database: {e}")
     
     def setup_logging(self):
         """Setup comprehensive logging"""
-        logging.basicConfig(
-            level=logging.DEBUG,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler('debug.log'),
-                logging.StreamHandler()
-            ]
-        )
-        self.logger = logging.getLogger('TradingDashboard')
+        try:
+            logging.basicConfig(
+                level=logging.DEBUG,
+                format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                handlers=[
+                    logging.FileHandler('debug.log'),
+                    logging.StreamHandler()
+                ]
+            )
+            self.logger = logging.getLogger('TradingDashboard')
+        except Exception as e:
+            print(f"Logging setup failed: {e}")
+            self.logger = logging.getLogger('TradingDashboard')
     
     def capture_system_context(self):
         """Capture current system state for debugging"""
@@ -84,32 +109,35 @@ class AIDebugSystem:
             "streamlit_session": dict(st.session_state) if hasattr(st, 'session_state') else {},
             "python_version": sys.version,
             "working_directory": os.getcwd(),
-            "environment_vars": {k: v for k, v in os.environ.items() if 'KEY' not in k and 'SECRET' not in k},
+            "anthropic_available": self.anthropic_available,
         }
         
-        # Add trading-specific context
+        # Add trading-specific context safely
         try:
-            if hasattr(st.session_state, 'paper_db'):
-                # Get recent positions and trades
+            if os.path.exists('paper_trading.db'):
                 conn = sqlite3.connect('paper_trading.db')
-                context["recent_trades"] = pd.read_sql_query(
-                    "SELECT * FROM trades ORDER BY timestamp DESC LIMIT 5", conn
-                ).to_dict('records')
-                context["current_positions"] = pd.read_sql_query(
-                    "SELECT * FROM positions WHERE quantity != 0", conn
-                ).to_dict('records')
-                conn.close()
-        except:
-            context["trading_context"] = "Unable to capture trading context"
+                try:
+                    context["recent_trades"] = pd.read_sql_query(
+                        "SELECT * FROM trades ORDER BY timestamp DESC LIMIT 5", conn
+                    ).to_dict('records')
+                    context["current_positions"] = pd.read_sql_query(
+                        "SELECT * FROM positions WHERE quantity != 0", conn
+                    ).to_dict('records')
+                except:
+                    context["trading_context"] = "Trading database exists but query failed"
+                finally:
+                    conn.close()
+        except Exception as e:
+            context["trading_context"] = f"Unable to capture trading context: {e}"
         
         return context
     
     def ai_analyze_error(self, error_info, context=None):
         """Get AI analysis of error"""
-        if not self.client:
-            return "Claude API not available. Please add your Claude API key to secrets."
+        if not self.client or not ANTHROPIC_AVAILABLE:
+            return "🤖 **AI Analysis Not Available**\n\nTo enable AI error analysis:\n1. Install: `pip install anthropic`\n2. Add your Claude API key to Streamlit secrets\n3. Restart the application\n\n**Manual Debug Info:**\n- Error Type: " + error_info.get('type', 'Unknown') + "\n- Function: " + error_info.get('function', 'Unknown') + "\n- Check the traceback above for specific line numbers and fix syntax/logic errors."
         
-        context_str = json.dumps(context, indent=2) if context else "No additional context"
+        context_str = json.dumps(context, indent=2, default=str) if context else "No additional context"
         
         prompt = f"""
         You are an expert Python/Streamlit developer debugging a trading dashboard application.
@@ -152,28 +180,31 @@ class AIDebugSystem:
             )
             return response.content[0].text if hasattr(response.content[0], 'text') else str(response.content[0])
         except Exception as e:
-            return f"AI Analysis failed: {str(e)}"
+            return f"AI Analysis failed: {str(e)}\n\nManual debugging needed - check the error traceback above."
     
     def log_error(self, error_info, context=None, ai_diagnosis=None):
         """Log error to database"""
-        conn = sqlite3.connect(self.debug_db)
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            INSERT INTO debug_logs 
-            (error_type, error_message, traceback_info, function_name, context_data, ai_diagnosis)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (
-            error_info.get('type', ''),
-            error_info.get('message', ''),
-            error_info.get('traceback', ''),
-            error_info.get('function', ''),
-            json.dumps(context) if context else '',
-            ai_diagnosis or ''
-        ))
-        
-        conn.commit()
-        conn.close()
+        try:
+            conn = sqlite3.connect(self.debug_db)
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                INSERT INTO debug_logs 
+                (error_type, error_message, traceback_info, function_name, context_data, ai_diagnosis)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                error_info.get('type', ''),
+                error_info.get('message', ''),
+                error_info.get('traceback', ''),
+                error_info.get('function', ''),
+                json.dumps(context, default=str) if context else '',
+                ai_diagnosis or ''
+            ))
+            
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            self.logger.error(f"Failed to log error to database: {e}")
     
     def smart_exception_handler(self, exc_type, exc_value, exc_traceback):
         """Advanced exception handler with AI analysis"""
@@ -281,7 +312,9 @@ def manual_debug_panel():
     
     if st.sidebar.button("🤖 Get AI Analysis"):
         if error_input:
-            debug_system = AIDebugSystem()
+            debug_system = st.session_state.get('debug_system')
+            if not debug_system:
+                debug_system = AIDebugSystem()
             
             error_info = {
                 "type": "Manual Entry",
@@ -301,6 +334,10 @@ def manual_debug_panel():
 def error_logs_panel():
     """Display error logs from database"""
     try:
+        if not os.path.exists("debug_logs.db"):
+            st.sidebar.info("No error logs yet - system running smoothly!")
+            return
+            
         conn = sqlite3.connect("debug_logs.db")
         logs_df = pd.read_sql_query(
             "SELECT * FROM debug_logs ORDER BY timestamp DESC LIMIT 20", conn
@@ -332,8 +369,8 @@ def error_logs_panel():
                         st.markdown(log_details['ai_diagnosis'])
         else:
             st.sidebar.info("No error logs found")
-    except:
-        st.sidebar.warning("Error logs database not available")
+    except Exception as e:
+        st.sidebar.warning(f"Error logs unavailable: {e}")
 
 def live_monitoring_panel():
     """Live system monitoring"""
@@ -344,30 +381,41 @@ def live_monitoring_panel():
         
         # Check database connections
         try:
-            conn = sqlite3.connect("paper_trading.db")
-            conn.close()
-            st.success("✅ Paper trading database: Connected")
-        except:
-            st.error("❌ Paper trading database: Connection failed")
+            if os.path.exists("paper_trading.db"):
+                conn = sqlite3.connect("paper_trading.db")
+                conn.close()
+                st.success("✅ Paper trading database: Connected")
+            else:
+                st.info("ℹ️ Paper trading database: Not yet created")
+        except Exception as e:
+            st.error(f"❌ Paper trading database: Connection failed - {e}")
         
         # Check API endpoints
         try:
             import requests
-            response = requests.get("https://api.polygon.io/v2/aggs/ticker/AAPL/range/1/day/2023-01-01/2023-01-02?apikey=test")
-            if response.status_code in [200, 401]:  # 401 means endpoint works but auth failed
+            response = requests.get("https://api.polygon.io/v2/aggs/ticker/AAPL/range/1/day/2023-01-01/2023-01-02?apikey=test", timeout=5)
+            if response.status_code in [200, 401, 403]:  # These mean endpoint works
                 st.success("✅ Polygon API: Endpoint reachable")
             else:
-                st.warning("⚠️ Polygon API: Unexpected response")
-        except:
-            st.error("❌ Polygon API: Connection failed")
+                st.warning(f"⚠️ Polygon API: Unexpected response ({response.status_code})")
+        except Exception as e:
+            st.error(f"❌ Polygon API: Connection failed - {e}")
         
-        # Memory usage
+        # Check AI availability
+        if ANTHROPIC_AVAILABLE:
+            st.success("✅ Anthropic library: Installed")
+        else:
+            st.warning("⚠️ Anthropic library: Not installed (AI features limited)")
+        
+        # Memory usage (if psutil available)
         try:
             import psutil
             memory = psutil.virtual_memory()
             st.info(f"💾 Memory Usage: {memory.percent}%")
-        except:
-            st.info("💾 Memory monitoring not available")
+        except ImportError:
+            st.info("💾 Memory monitoring: psutil not available")
+        except Exception as e:
+            st.warning(f"💾 Memory monitoring: {e}")
 
 def code_analysis_panel():
     """Code analysis and suggestions"""
@@ -381,7 +429,9 @@ def code_analysis_panel():
     
     if st.sidebar.button("🔍 Analyze Code"):
         if code_input:
-            debug_system = AIDebugSystem()
+            debug_system = st.session_state.get('debug_system')
+            if not debug_system:
+                debug_system = AIDebugSystem()
             
             # Create analysis prompt based on type
             prompts = {
@@ -391,7 +441,7 @@ def code_analysis_panel():
                 "Security Scan": f"Check this code for security vulnerabilities:\n\n{code_input}"
             }
             
-            if debug_system.client:
+            if debug_system.client and ANTHROPIC_AVAILABLE:
                 try:
                     response = debug_system.client.messages.create(
                         model="claude-3-sonnet-20240229",
@@ -408,7 +458,9 @@ def code_analysis_panel():
                 except Exception as e:
                     st.error(f"Analysis failed: {e}")
             else:
-                st.error("Claude API not available for code analysis")
+                st.error("Claude API not available for code analysis. Please check your API key and ensure 'anthropic' is installed.")
+        else:
+            st.sidebar.warning("Please enter code to analyze")
 
 # Integration functions for the main dashboard
 def integrate_ai_debugging():
@@ -417,7 +469,10 @@ def integrate_ai_debugging():
         st.session_state.debug_system = AIDebugSystem()
     
     # Set up automatic exception handling
-    sys.excepthook = st.session_state.debug_system.smart_exception_handler
+    try:
+        sys.excepthook = st.session_state.debug_system.smart_exception_handler
+    except Exception as e:
+        st.warning(f"Could not set up automatic exception handling: {e}")
     
     return st.session_state.debug_system
 
@@ -426,7 +481,12 @@ def debug_wrapper(func):
     def wrapper(*args, **kwargs):
         debug_system = st.session_state.get('debug_system')
         if debug_system:
-            with debug_system.debug_function(func.__name__):
+            try:
+                with debug_system.debug_function(func.__name__):
+                    return func(*args, **kwargs)
+            except Exception as e:
+                # If debug system fails, still run the original function
+                st.warning(f"Debug system error in {func.__name__}: {e}")
                 return func(*args, **kwargs)
         else:
             return func(*args, **kwargs)
