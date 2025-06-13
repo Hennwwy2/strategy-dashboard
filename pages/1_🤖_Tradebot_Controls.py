@@ -633,68 +633,59 @@ if st.session_state.authenticated:
     st.success("✅ Access Granted")
     st.info("🔄 **Enhanced with Volatility Arbitrage + Momentum Strategies**")
     
-    # Choose trading strategy
-    col1, col2, col3 = st.columns(3)
+    # Strategy sections stacked vertically for better readability
     
-    with col1:
-        st.subheader("📈 Momentum Strategy")
-        st.write("Classic momentum-based trading")
-        st.write("• 200-day moving average regime")
-        st.write("• Trend following with buffer zones")
-        st.write("• Stock position management")
-        
-        if st.button("🏃 Run Momentum Strategy", use_container_width=True):
-            with st.spinner("Analyzing momentum signals..."):
-                returned_logs = run_trade_logic()
-                
-            st.subheader("Momentum Strategy Log:")
-            log_text = "\n".join(returned_logs)
-            # Create a much larger text area for better readability
-            st.text_area("Strategy Output", log_text, height=400, disabled=True)
-            
-            st.session_state.last_momentum_run = datetime.now()
-            st.session_state.last_momentum_logs = returned_logs
+    # 1. MOMENTUM STRATEGY (TOP)
+    st.subheader("📈 Momentum Strategy")
+    st.write("Classic momentum-based trading using 200-day moving average regime with trend following and buffer zones for stock position management.")
     
-    with col2:
-        st.subheader("🔬 Volatility Arbitrage")
-        st.write("Advanced volatility trading")
-        st.write("• Realized vs Implied volatility")
-        st.write("• Multi-timeframe vol analysis")
-        st.write("• Options premium strategies")
-        
-        if st.button("🎯 Run Vol Arbitrage", use_container_width=True):
-            with st.spinner("Analyzing volatility surface..."):
-                returned_logs = run_volatility_arbitrage_strategy()
-                
-            st.subheader("Volatility Arbitrage Log:")
-            log_text = "\n".join(returned_logs)
-            # Create a much larger text area for the volatility arbitrage logs
-            st.text_area("Volatility Analysis Output", log_text, height=500, disabled=True)
+    if st.button("🏃 Run Momentum Strategy", use_container_width=True, type="primary"):
+        with st.spinner("Analyzing momentum signals..."):
+            returned_logs = run_trade_logic()
             
-            st.session_state.last_vol_arb_run = datetime.now()
-            st.session_state.last_vol_arb_logs = returned_logs
+        st.write("**Momentum Strategy Results:**")
+        log_text = "\n".join(returned_logs)
+        st.text_area("Momentum Analysis Output", log_text, height=400, disabled=True, key="momentum_log")
+        
+        st.session_state.last_momentum_run = datetime.now()
+        st.session_state.last_momentum_logs = returned_logs
     
-    with col3:
-        st.subheader("🚀 Combined Strategy")
-        st.write("Run both strategies together")
-        st.write("• Momentum for directional trades")
-        st.write("• Vol arbitrage for income")
-        st.write("• Portfolio diversification")
-        
-        if st.button("⚡ Run Both Strategies", use_container_width=True):
-            with st.spinner("Running combined analysis..."):
-                momentum_logs = run_trade_logic()
-                vol_arb_logs = run_volatility_arbitrage_strategy()
-                
-                combined_logs = ["=== MOMENTUM STRATEGY ==="] + momentum_logs + \
-                               ["", "=== VOLATILITY ARBITRAGE ==="] + vol_arb_logs
-                
-            st.subheader("Combined Strategy Log:")
-            log_text = "\n".join(combined_logs)
-            # Create an even larger text area for combined logs
-            st.text_area("Combined Strategy Output", log_text, height=600, disabled=True)
+    st.divider()
+    
+    # 2. VOLATILITY ARBITRAGE (MIDDLE)
+    st.subheader("🔬 Volatility Arbitrage Strategy")
+    st.write("Advanced volatility trading analyzing realized vs implied volatility with multi-timeframe analysis and options premium strategies.")
+    
+    if st.button("🎯 Run Volatility Arbitrage", use_container_width=True, type="primary"):
+        with st.spinner("Analyzing volatility surface..."):
+            returned_logs = run_volatility_arbitrage_strategy()
             
-            st.session_state.last_combined_run = datetime.now()
+        st.write("**Volatility Arbitrage Results:**")
+        log_text = "\n".join(returned_logs)
+        st.text_area("Volatility Analysis Output", log_text, height=500, disabled=True, key="vol_arb_log")
+        
+        st.session_state.last_vol_arb_run = datetime.now()
+        st.session_state.last_vol_arb_logs = returned_logs
+    
+    st.divider()
+    
+    # 3. COMBINED STRATEGY (BOTTOM)
+    st.subheader("🚀 Combined Strategy - Both Approaches")
+    st.write("Execute both momentum and volatility arbitrage strategies together for momentum directional trades plus market-neutral volatility income and portfolio diversification.")
+    
+    if st.button("⚡ Run Both Strategies", use_container_width=True, type="secondary"):
+        with st.spinner("Running combined analysis..."):
+            momentum_logs = run_trade_logic()
+            vol_arb_logs = run_volatility_arbitrage_strategy()
+            
+            combined_logs = ["=== MOMENTUM STRATEGY ==="] + momentum_logs + \
+                           ["", "=== VOLATILITY ARBITRAGE ==="] + vol_arb_logs
+            
+        st.write("**Combined Strategy Results:**")
+        log_text = "\n".join(combined_logs)
+        st.text_area("Combined Strategy Output", log_text, height=600, disabled=True, key="combined_log")
+        
+        st.session_state.last_combined_run = datetime.now()
     
     # Account status - Make it wider and more readable
     st.divider()
