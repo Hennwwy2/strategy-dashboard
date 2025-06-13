@@ -1,4 +1,4 @@
-# pages/1_🤖_Tradebot_Controls.py - Updated for Polygon
+# pages/1_🤖_Tradebot_Controls.py - Enhanced with Volatility Arbitrage
 import streamlit as st
 import requests
 from tiingo import TiingoClient
@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import math
 import sqlite3
 import configparser
+import numpy as np
 
 # Polygon API wrapper class
 class PolygonAPI:
@@ -25,6 +26,23 @@ class PolygonAPI:
                 return data['results']['p']  # Return just the price
         return None
     
+    def get_options_chain(self, underlying_symbol, expiration_date=None):
+        """Get options chain for volatility analysis"""
+        url = f"{self.base_url}/v3/reference/options/contracts"
+        params = {
+            "underlying_ticker": underlying_symbol,
+            "apikey": self.api_key,
+            "limit": 100
+        }
+        
+        if expiration_date:
+            params["expiration_date"] = expiration_date
+            
+        response = requests.get(url, params=params)
+        if response.status_code == 200:
+            return response.json()
+        return None
+    
     def get_options_quote(self, options_ticker):
         """Get options quote"""
         url = f"{self.base_url}/v3/last/trade/options/{options_ticker}"
@@ -36,7 +54,7 @@ class PolygonAPI:
                 return data['results']['p']
         return None
 
-# Paper Trading Database Manager (same as dashboard)
+# Enhanced Paper Trading Database Manager
 class PaperTradingDB:
     def __init__(self, db_path="paper_trading.db"):
         self.db_path = db_path
@@ -54,7 +72,8 @@ class PaperTradingDB:
                 symbol TEXT NOT NULL,
                 quantity REAL NOT NULL,
                 avg_price REAL NOT NULL,
-                position_type TEXT NOT NULL, -- 'stock' or 'option'
+                position_type TEXT NOT NULL, -- 'stock', 'call', 'put', 'vol_arb'
+                strategy_type TEXT DEFAULT 'momentum', -- 'momentum', 'vol_arbitrage'
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
@@ -68,6 +87,21 @@ class PaperTradingDB:
                 price REAL NOT NULL,
                 side TEXT NOT NULL, -- 'buy' or 'sell'
                 trade_type TEXT NOT NULL, -- 'stock' or 'option'
+                strategy_type TEXT DEFAULT 'momentum',
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Create volatility tracking table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS volatility_data (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                symbol TEXT NOT NULL,
+                date DATE NOT NULL,
+                realized_vol REAL,
+                implied_vol REAL,
+                vol_spread REAL,
+                price REAL,
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
@@ -107,23 +141,22 @@ class PaperTradingDB:
             conn.close()
             return df
         except Exception as e:
-            # Return empty dataframe if table doesn't exist or other error
             print(f"Error getting positions: {e}")
-            return pd.DataFrame(columns=['id', 'symbol', 'quantity', 'avg_price', 'position_type', 'created_at'])
+            return pd.DataFrame(columns=['id', 'symbol', 'quantity', 'avg_price', 'position_type', 'strategy_type', 'created_at'])
     
-    def add_trade(self, symbol, quantity, price, side, trade_type='stock'):
+    def add_trade(self, symbol, quantity, price, side, trade_type='stock', strategy_type='momentum'):
         """Add a trade to the database"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
         # Add trade to trades table
         cursor.execute('''
-            INSERT INTO trades (symbol, quantity, price, side, trade_type)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (symbol, quantity, price, side, trade_type))
+            INSERT INTO trades (symbol, quantity, price, side, trade_type, strategy_type)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (symbol, quantity, price, side, trade_type, strategy_type))
         
         # Update positions
-        cursor.execute('SELECT quantity, avg_price FROM positions WHERE symbol = ?', (symbol,))
+        cursor.execute('SELECT quantity, avg_price FROM positions WHERE symbol = ? AND strategy_type = ?', (symbol, strategy_type))
         existing = cursor.fetchone()
         
         if existing:
@@ -136,14 +169,14 @@ class PaperTradingDB:
                 new_avg = existing_avg  # Keep same average price
             
             cursor.execute('''
-                UPDATE positions SET quantity = ?, avg_price = ? WHERE symbol = ?
-            ''', (new_qty, new_avg, symbol))
+                UPDATE positions SET quantity = ?, avg_price = ? WHERE symbol = ? AND strategy_type = ?
+            ''', (new_qty, new_avg, symbol, strategy_type))
         else:
             if side == 'buy':
                 cursor.execute('''
-                    INSERT INTO positions (symbol, quantity, avg_price, position_type)
-                    VALUES (?, ?, ?, ?)
-                ''', (symbol, quantity, price, trade_type))
+                    INSERT INTO positions (symbol, quantity, avg_price, position_type, strategy_type)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (symbol, quantity, price, trade_type, strategy_type))
         
         # Update cash
         cash_change = -quantity * price if side == 'buy' else quantity * price
@@ -154,6 +187,21 @@ class PaperTradingDB:
         
         return True
     
+    def add_volatility_data(self, symbol, realized_vol, implied_vol, price):
+        """Track volatility data for analysis"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        vol_spread = implied_vol - realized_vol
+        
+        cursor.execute('''
+            INSERT INTO volatility_data (symbol, date, realized_vol, implied_vol, vol_spread, price)
+            VALUES (?, DATE('now'), ?, ?, ?, ?)
+        ''', (symbol, realized_vol, implied_vol, vol_spread, price))
+        
+        conn.commit()
+        conn.close()
+    
     def get_account_info(self):
         """Get account information"""
         conn = sqlite3.connect(self.db_path)
@@ -163,14 +211,258 @@ class PaperTradingDB:
         conn.close()
         return {"cash": result[0], "portfolio_value": result[1]} if result else {"cash": 100000, "portfolio_value": 100000}
 
+class VolatilityCalculator:
+    """Calculate various volatility metrics"""
+    
+    @staticmethod
+    def realized_volatility(prices, window=30):
+        """Calculate realized volatility (historical)"""
+        if len(prices) < window:
+            return None
+        
+        returns = prices.pct_change().dropna()
+        realized_vol = returns.rolling(window=window).std() * np.sqrt(252)  # Annualized
+        return realized_vol.iloc[-1] if not realized_vol.empty else None
+    
+    @staticmethod
+    def parkinson_volatility(high, low, window=30):
+        """Parkinson estimator - more efficient than close-to-close"""
+        if len(high) < window or len(low) < window:
+            return None
+        
+        hl_ratio = np.log(high / low)
+        parkinson_vol = np.sqrt((1/(4*np.log(2))) * (hl_ratio**2).rolling(window=window).mean()) * np.sqrt(252)
+        return parkinson_vol.iloc[-1] if not parkinson_vol.empty else None
+    
+    @staticmethod
+    def garch_volatility(returns, window=30):
+        """Simple GARCH(1,1) approximation"""
+        if len(returns) < window:
+            return None
+        
+        # Simplified GARCH - in practice, you'd use arch package
+        squared_returns = returns**2
+        garch_vol = np.sqrt(squared_returns.rolling(window=window).mean()) * np.sqrt(252)
+        return garch_vol.iloc[-1] if not garch_vol.empty else None
+    
+    @staticmethod
+    def implied_volatility_proxy(option_price, stock_price, strike, time_to_expiry, risk_free_rate=0.05):
+        """Simplified Black-Scholes implied volatility approximation"""
+        # This is a very simplified approximation - in practice, use scipy.optimize or specialized libraries
+        if time_to_expiry <= 0 or option_price <= 0:
+            return None
+        
+        # Approximate IV using Brenner-Subrahmanyam formula
+        moneyness = stock_price / strike
+        if moneyness <= 0:
+            return None
+        
+        # Simplified approximation
+        iv_approx = (option_price / stock_price) * np.sqrt(2 * np.pi / time_to_expiry)
+        return min(max(iv_approx, 0.05), 2.0)  # Cap between 5% and 200%
+
+def run_volatility_arbitrage_strategy():
+    """Advanced volatility arbitrage strategy"""
+    logs = []
+    
+    # 1. CONNECT TO APIS
+    logs.append("🔬 Connecting to APIs for Volatility Arbitrage...")
+    try:
+        try:
+            polygon_key = st.secrets["polygon"]["api_key"]
+            tiingo_key = st.secrets["tiingo"]["api_key"]
+        except:
+            config = configparser.ConfigParser()
+            config.read('config.ini')
+            polygon_key = config['polygon']['api_key']
+            tiingo_key = config['tiingo']['api_key']
+        
+        polygon_api = PolygonAPI(polygon_key)
+        tiingo_config = {'api_key': tiingo_key, 'session': True}
+        tiingo_client = TiingoClient(tiingo_config)
+        paper_db = PaperTradingDB()
+        vol_calc = VolatilityCalculator()
+        
+        logs.append("✅ Successfully connected to APIs")
+    except Exception as e:
+        logs.append(f"❌ ERROR: Failed to connect to APIs. Error: {e}")
+        return logs
+
+    # 2. ANALYZE VOLATILITY SURFACE
+    UNDERLYING = 'NVDA'
+    logs.append(f"📊 Analyzing volatility surface for {UNDERLYING}...")
+    
+    try:
+        # Get historical data for realized volatility calculation
+        end_date = pd.Timestamp.now()
+        start_date = end_date - pd.Timedelta(days=90)
+        
+        data = tiingo_client.get_dataframe(
+            UNDERLYING,
+            frequency='daily',
+            startDate=start_date.strftime('%Y-%m-%d'),
+            endDate=end_date.strftime('%Y-%m-%d')
+        )
+        
+        if data.empty or len(data) < 30:
+            logs.append("❌ Insufficient historical data for volatility analysis")
+            return logs
+        
+        # Get current price
+        current_price = polygon_api.get_quote(UNDERLYING)
+        if current_price is None:
+            current_price = data['close'].iloc[-1]
+            logs.append(f"Using historical price: ${current_price:.2f}")
+        else:
+            logs.append(f"Current price: ${current_price:.2f}")
+        
+        # Calculate multiple volatility measures
+        realized_vol_30 = vol_calc.realized_volatility(data['close'], window=30)
+        realized_vol_10 = vol_calc.realized_volatility(data['close'], window=10)
+        
+        if 'high' in data.columns and 'low' in data.columns:
+            parkinson_vol = vol_calc.parkinson_volatility(data['high'], data['low'], window=30)
+        else:
+            parkinson_vol = None
+        
+        logs.append(f"📈 Realized Vol (30-day): {realized_vol_30*100:.1f}%" if realized_vol_30 else "❌ Cannot calculate 30-day RV")
+        logs.append(f"📈 Realized Vol (10-day): {realized_vol_10*100:.1f}%" if realized_vol_10 else "❌ Cannot calculate 10-day RV")
+        if parkinson_vol:
+            logs.append(f"📈 Parkinson Vol (30-day): {parkinson_vol*100:.1f}%")
+        
+    except Exception as e:
+        logs.append(f"❌ ERROR in volatility calculation: {e}")
+        return logs
+    
+    # 3. ANALYZE OPTIONS CHAIN FOR IMPLIED VOLATILITY
+    logs.append("🎯 Analyzing options chain for implied volatility...")
+    
+    try:
+        options_data = polygon_api.get_options_chain(UNDERLYING)
+        
+        if not options_data or 'results' not in options_data:
+            logs.append("❌ No options data available - simulating implied volatility")
+            # Simulate implied volatility for demo
+            simulated_iv = realized_vol_30 * (1 + np.random.normal(0, 0.2)) if realized_vol_30 else 0.25
+            simulated_iv = max(0.1, min(simulated_iv, 1.0))  # Cap between 10% and 100%
+            implied_vol = simulated_iv
+            logs.append(f"📊 Simulated Implied Vol: {implied_vol*100:.1f}%")
+        else:
+            # Analyze real options data
+            options = options_data['results'][:10]  # Limit for demo
+            iv_estimates = []
+            
+            for option in options:
+                try:
+                    strike = option.get('strike_price', current_price)
+                    expiry_str = option.get('expiration_date', '')
+                    
+                    if expiry_str:
+                        expiry_date = pd.to_datetime(expiry_str)
+                        time_to_expiry = (expiry_date - pd.Timestamp.now()).days / 365.0
+                        
+                        if time_to_expiry > 0:
+                            # Get option price (simplified - would need bid/ask)
+                            option_ticker = option.get('ticker', '')
+                            option_price = polygon_api.get_options_quote(option_ticker)
+                            
+                            if option_price and option_price > 0:
+                                iv = vol_calc.implied_volatility_proxy(
+                                    option_price, current_price, strike, time_to_expiry
+                                )
+                                if iv:
+                                    iv_estimates.append(iv)
+                except:
+                    continue
+            
+            if iv_estimates:
+                implied_vol = np.median(iv_estimates)
+                logs.append(f"📊 Median Implied Vol: {implied_vol*100:.1f}% (from {len(iv_estimates)} options)")
+            else:
+                # Fallback to simulation
+                implied_vol = realized_vol_30 * 1.2 if realized_vol_30 else 0.25
+                logs.append(f"📊 Estimated Implied Vol: {implied_vol*100:.1f}%")
+        
+    except Exception as e:
+        logs.append(f"❌ ERROR in options analysis: {e}")
+        implied_vol = realized_vol_30 * 1.1 if realized_vol_30 else 0.25
+    
+    # 4. VOLATILITY ARBITRAGE DECISION
+    logs.append("🧠 Making volatility arbitrage decision...")
+    
+    if realized_vol_30 and implied_vol:
+        vol_spread = implied_vol - realized_vol_30
+        vol_spread_pct = (vol_spread / realized_vol_30) * 100
+        
+        logs.append(f"📊 Volatility Analysis:")
+        logs.append(f"   Realized Vol: {realized_vol_30*100:.1f}%")
+        logs.append(f"   Implied Vol: {implied_vol*100:.1f}%")
+        logs.append(f"   Vol Spread: {vol_spread*100:.1f}% ({vol_spread_pct:+.1f}%)")
+        
+        # Store volatility data
+        paper_db.add_volatility_data(UNDERLYING, realized_vol_30, implied_vol, current_price)
+        
+        # Trading decision logic
+        if vol_spread_pct > 15:  # Implied > Realized by 15%+
+            logs.append("📈 SIGNAL: SELL VOLATILITY (Implied vol is expensive)")
+            logs.append("💡 STRATEGY: Sell straddle/strangle (collect premium)")
+            logs.append("🎯 Expected Profit: Market will be less volatile than options imply")
+            
+            # Simulate vol selling trade
+            premium_collected = current_price * 0.05  # Simplified
+            logs.append(f"📋 Simulated Volatility Sale:")
+            logs.append(f"   Premium Collected: ${premium_collected:.2f}")
+            logs.append(f"   Max Profit: ${premium_collected:.2f}")
+            logs.append(f"   Breakeven Range: ${current_price - premium_collected:.2f} - ${current_price + premium_collected:.2f}")
+            
+            # Record trade
+            try:
+                paper_db.add_trade(
+                    f"{UNDERLYING}_VOL_SELL", 1, premium_collected, 'sell', 
+                    'vol_arbitrage', 'vol_arbitrage'
+                )
+                logs.append("✅ Volatility arbitrage trade recorded")
+            except Exception as e:
+                logs.append(f"❌ Error recording trade: {e}")
+                
+        elif vol_spread_pct < -10:  # Realized > Implied by 10%+
+            logs.append("📉 SIGNAL: BUY VOLATILITY (Implied vol is cheap)")
+            logs.append("💡 STRATEGY: Buy straddle/strangle (pay premium)")
+            logs.append("🎯 Expected Profit: Market will be more volatile than options imply")
+            
+            # Simulate vol buying trade
+            premium_paid = current_price * 0.04  # Simplified
+            logs.append(f"📋 Simulated Volatility Purchase:")
+            logs.append(f"   Premium Paid: ${premium_paid:.2f}")
+            logs.append(f"   Breakeven Range: ${current_price - premium_paid:.2f} - ${current_price + premium_paid:.2f}")
+            
+            # Record trade
+            try:
+                paper_db.add_trade(
+                    f"{UNDERLYING}_VOL_BUY", 1, premium_paid, 'buy', 
+                    'vol_arbitrage', 'vol_arbitrage'
+                )
+                logs.append("✅ Volatility arbitrage trade recorded")
+            except Exception as e:
+                logs.append(f"❌ Error recording trade: {e}")
+                
+        else:
+            logs.append("➡️ SIGNAL: NEUTRAL - Volatility fairly priced")
+            logs.append("💡 STRATEGY: Wait for better volatility arbitrage opportunity")
+            logs.append(f"🎯 Need vol spread > 15% or < -10% (current: {vol_spread_pct:+.1f}%)")
+    
+    logs.append("--- Volatility Arbitrage Analysis Complete ---")
+    logs.append("📝 Note: This is educational - real vol arbitrage requires delta hedging")
+    
+    return logs
+
 def run_trade_logic():
-    """Main trading logic function using Polygon data and paper trading"""
+    """Original momentum trading logic function"""
     logs = []
     
     # 1. CONNECT TO APIS
     logs.append("Connecting to APIs...")
     try:
-        # Get API keys
         try:
             polygon_key = st.secrets["polygon"]["api_key"]
             tiingo_key = st.secrets["tiingo"]["api_key"]
@@ -204,9 +496,8 @@ def run_trade_logic():
     logs.append("Fetching latest market data...")
     try:
         end_date = pd.Timestamp.now()
-        start_date = end_date - pd.Timedelta(days=250)  # Get enough data for 200-day MA
+        start_date = end_date - pd.Timedelta(days=250)
         
-        # Use Tiingo for historical data (more reliable)
         data = tiingo_client.get_dataframe(
             STOCK_TO_TRADE, 
             frequency='daily', 
@@ -218,16 +509,14 @@ def run_trade_logic():
             logs.append(f"❌ ERROR: Not enough data. Only {len(data)} days available.")
             return logs
         
-        # Get current price from Polygon (real-time)
         current_price = polygon_api.get_quote(STOCK_TO_TRADE)
         if current_price is None:
-            # Fallback to Tiingo's latest price
             current_price = data['close'].iloc[-1]
             logs.append(f"Using Tiingo price as fallback: ${current_price:.2f}")
         else:
             logs.append(f"Current price from Polygon: ${current_price:.2f}")
 
-        # Calculate moving average and bands using historical data
+        # Calculate moving average and bands
         data['regime_ma'] = data['close'].rolling(window=200).mean()
         buffer = 0.02
         data['upper_band'] = data['regime_ma'] * (1 + buffer)
@@ -256,12 +545,11 @@ def run_trade_logic():
     else:
         logs.append(f"➡️ DECISION: Price (${current_price:.2f}) is inside buffer zone. Holding current position.")
 
-    # 5. TAKE ACTION (Paper Trading)
+    # 5. TAKE ACTION
     if desired_position is not None:
         if desired_position == 1 and current_qty == 0:
-            # BUY
             account_info = paper_db.get_account_info()
-            USD_TO_TRADE = min(10000, account_info['cash'])  # Don't trade more than available cash
+            USD_TO_TRADE = min(10000, account_info['cash'])
             qty_to_buy = int(USD_TO_TRADE / current_price)
             
             logs.append(f"💰 ACTION: Current position is 0, desired is IN.")
@@ -270,7 +558,7 @@ def run_trade_logic():
             
             if qty_to_buy > 0:
                 try:
-                    success = paper_db.add_trade(STOCK_TO_TRADE, qty_to_buy, current_price, 'buy')
+                    success = paper_db.add_trade(STOCK_TO_TRADE, qty_to_buy, current_price, 'buy', 'stock', 'momentum')
                     if success:
                         logs.append(f"✅ Successfully placed paper BUY order for {qty_to_buy} shares at ${current_price:.2f}")
                     else:
@@ -281,12 +569,11 @@ def run_trade_logic():
                 logs.append(f"❌ Cannot buy: Insufficient funds or price too high")
                 
         elif desired_position == 0 and current_qty > 0:
-            # SELL
             logs.append(f"💸 ACTION: Current position is {current_qty}, desired is OUT.")
             logs.append(f"Placing paper SELL order to liquidate position...")
             
             try:
-                success = paper_db.add_trade(STOCK_TO_TRADE, current_qty, current_price, 'sell')
+                success = paper_db.add_trade(STOCK_TO_TRADE, current_qty, current_price, 'sell', 'stock', 'momentum')
                 if success:
                     logs.append(f"✅ Successfully placed paper SELL order for {current_qty} shares at ${current_price:.2f}")
                 else:
@@ -298,115 +585,12 @@ def run_trade_logic():
     else:
         logs.append("✅ No action needed - price is in buffer zone.")
             
-    logs.append("--- Paper Trading Bot logic finished. ---")
-    return logs
-
-def run_options_trade_logic():
-    """Options trading logic using Polygon data"""
-    logs = []
-    
-    # 1. CONNECT TO APIS
-    logs.append("Connecting to APIs for options trading...")
-    try:
-        try:
-            polygon_key = st.secrets["polygon"]["api_key"]
-            tiingo_key = st.secrets["tiingo"]["api_key"]
-        except:
-            config = configparser.ConfigParser()
-            config.read('config.ini')
-            polygon_key = config['polygon']['api_key']
-            tiingo_key = config['tiingo']['api_key']
-        
-        polygon_api = PolygonAPI(polygon_key)
-        tiingo_config = {'api_key': tiingo_key, 'session': True}
-        tiingo_client = TiingoClient(tiingo_config)
-        paper_db = PaperTradingDB()
-        
-        logs.append("✅ Successfully connected to APIs")
-    except Exception as e:
-        logs.append(f"❌ ERROR: Failed to connect to APIs. Error: {e}")
-        return logs
-
-    # 2. CHECK CURRENT OPTIONS POSITIONS
-    UNDERLYING = 'NVDA'
-    logs.append(f"Checking current options positions for {UNDERLYING}...")
-    
-    # For this demo, we'll simulate options positions
-    # In a real implementation, you'd track options positions separately
-    logs.append("✅ No current options positions (demo mode)")
-    
-    # 3. GET MARKET DATA AND SIGNALS
-    logs.append("Analyzing market conditions for options strategy...")
-    try:
-        # Get current price
-        current_price = polygon_api.get_quote(UNDERLYING)
-        if current_price is None:
-            logs.append("❌ Could not get current price from Polygon")
-            return logs
-        
-        logs.append(f"Current {UNDERLYING} price: ${current_price:.2f}")
-        
-        # Get historical data for momentum analysis
-        end_date = pd.Timestamp.now()
-        start_date = end_date - pd.Timedelta(days=50)
-        
-        data = tiingo_client.get_dataframe(
-            UNDERLYING, 
-            frequency='daily', 
-            startDate=start_date.strftime('%Y-%m-%d'),
-            endDate=end_date.strftime('%Y-%m-%d')
-        )
-        
-        # Simple momentum indicator
-        sma_20 = data['close'].rolling(20).mean().iloc[-1]
-        price_vs_sma = (current_price - sma_20) / sma_20 * 100
-        
-        logs.append(f"20-day SMA: ${sma_20:.2f}")
-        logs.append(f"Price vs SMA: {price_vs_sma:.1f}%")
-        
-        # Options strategy decision
-        if price_vs_sma > 5:
-            logs.append("📈 SIGNAL: Strong bullish momentum detected")
-            logs.append("💡 STRATEGY: Consider buying call options")
-            
-            # Simulate call option trade
-            strike_price = round(current_price * 1.05)  # 5% OTM call
-            option_premium = current_price * 0.03  # Simplified premium calculation
-            
-            logs.append(f"📋 Simulated Call Option Trade:")
-            logs.append(f"   Strike: ${strike_price}")
-            logs.append(f"   Premium: ${option_premium:.2f}")
-            logs.append(f"   Breakeven: ${strike_price + option_premium:.2f}")
-            
-        elif price_vs_sma < -5:
-            logs.append("📉 SIGNAL: Strong bearish momentum detected")
-            logs.append("💡 STRATEGY: Consider buying put options")
-            
-            # Simulate put option trade
-            strike_price = round(current_price * 0.95)  # 5% OTM put
-            option_premium = current_price * 0.03
-            
-            logs.append(f"📋 Simulated Put Option Trade:")
-            logs.append(f"   Strike: ${strike_price}")
-            logs.append(f"   Premium: ${option_premium:.2f}")
-            logs.append(f"   Breakeven: ${strike_price - option_premium:.2f}")
-            
-        else:
-            logs.append("➡️ SIGNAL: Neutral momentum")
-            logs.append("💡 STRATEGY: Consider selling options for income")
-        
-    except Exception as e:
-        logs.append(f"❌ ERROR in options analysis: {e}")
-        return logs
-    
-    logs.append("--- Options analysis complete (demo mode) ---")
-    logs.append("📝 Note: Real options trading requires additional risk management")
-    
+    logs.append("--- Momentum Trading Bot logic finished. ---")
     return logs
 
 # --- STREAMLIT PAGE UI ---
 st.set_page_config(initial_sidebar_state="collapsed")
-st.title("🤖 Polygon-Based Trading Bot Controls")
+st.title("🤖 Advanced Trading Bot Controls - Momentum + Volatility Arbitrage")
 
 # Password protection
 if 'authenticated' not in st.session_state:
@@ -414,98 +598,139 @@ if 'authenticated' not in st.session_state:
 
 password_guess = st.text_input("Enter Admin Password", type="password", key="admin_pass")
 
-# Get admin password from secrets or use default for local testing
 try:
     admin_password = st.secrets["admin_password"]
 except:
-    admin_password = "admin123"  # Default for local testing
+    admin_password = "admin123"
 
 if password_guess == admin_password and admin_password != "":
     st.session_state.authenticated = True
 
 if st.session_state.authenticated:
     st.success("✅ Access Granted")
-    st.info("🔄 **Now using Polygon.io for real-time data + Paper Trading simulation**")
+    st.info("🔄 **Enhanced with Volatility Arbitrage + Momentum Strategies**")
     
-    # Choose trading mode
-    col1, col2 = st.columns(2)
+    # Choose trading strategy
+    col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.subheader("Stock Paper Trading Bot")
-        st.write("Paper trading using Polygon real-time data")
-        st.write("• Uses SQLite database for positions")
-        st.write("• Polygon API for current prices")
-        st.write("• Tiingo for historical data")
+        st.subheader("📈 Momentum Strategy")
+        st.write("Classic momentum-based trading")
+        st.write("• 200-day moving average regime")
+        st.write("• Trend following with buffer zones")
+        st.write("• Stock position management")
         
-        if st.button("🏃 Run Stock Paper Trade Check", use_container_width=True):
-            with st.spinner("Bot is analyzing stock positions..."):
+        if st.button("🏃 Run Momentum Strategy", use_container_width=True):
+            with st.spinner("Analyzing momentum signals..."):
                 returned_logs = run_trade_logic()
                 
-            st.subheader("Stock Bot Activity Log:")
+            st.subheader("Momentum Strategy Log:")
             log_text = "\n".join(returned_logs)
             st.code(log_text)
             
-            st.session_state.last_stock_run = datetime.now()
-            st.session_state.last_stock_logs = returned_logs
+            st.session_state.last_momentum_run = datetime.now()
+            st.session_state.last_momentum_logs = returned_logs
     
     with col2:
-        st.subheader("Options Analysis Bot")
-        st.write("Options market analysis using Polygon")
-        st.write("• Real-time options data from Polygon")
-        st.write("• Momentum-based strategy signals")
-        st.write("• Educational/demo mode")
+        st.subheader("🔬 Volatility Arbitrage")
+        st.write("Advanced volatility trading")
+        st.write("• Realized vs Implied volatility")
+        st.write("• Multi-timeframe vol analysis")
+        st.write("• Options premium strategies")
         
-        if st.button("🎯 Run Options Analysis", use_container_width=True):
-            with st.spinner("Bot is analyzing options strategies..."):
-                returned_logs = run_options_trade_logic()
+        if st.button("🎯 Run Vol Arbitrage", use_container_width=True):
+            with st.spinner("Analyzing volatility surface..."):
+                returned_logs = run_volatility_arbitrage_strategy()
                 
-            st.subheader("Options Analysis Log:")
+            st.subheader("Volatility Arbitrage Log:")
             log_text = "\n".join(returned_logs)
             st.code(log_text)
             
-            st.session_state.last_options_run = datetime.now()
-            st.session_state.last_options_logs = returned_logs
+            st.session_state.last_vol_arb_run = datetime.now()
+            st.session_state.last_vol_arb_logs = returned_logs
     
-    # Show account status
+    with col3:
+        st.subheader("🚀 Combined Strategy")
+        st.write("Run both strategies together")
+        st.write("• Momentum for directional trades")
+        st.write("• Vol arbitrage for income")
+        st.write("• Portfolio diversification")
+        
+        if st.button("⚡ Run Both Strategies", use_container_width=True):
+            with st.spinner("Running combined analysis..."):
+                momentum_logs = run_trade_logic()
+                vol_arb_logs = run_volatility_arbitrage_strategy()
+                
+                combined_logs = ["=== MOMENTUM STRATEGY ==="] + momentum_logs + \
+                               ["", "=== VOLATILITY ARBITRAGE ==="] + vol_arb_logs
+                
+            st.subheader("Combined Strategy Log:")
+            log_text = "\n".join(combined_logs)
+            st.code(log_text)
+            
+            st.session_state.last_combined_run = datetime.now()
+    
+    # Account status
     st.divider()
-    st.subheader("📊 Paper Trading Account Status")
+    st.subheader("📊 Enhanced Paper Trading Account")
     
     try:
         paper_db = PaperTradingDB()
         account_info = paper_db.get_account_info()
         
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         col1.metric("Cash Balance", f"${account_info['cash']:,.2f}")
         col2.metric("Portfolio Value", f"${account_info['portfolio_value']:,.2f}")
         col3.metric("Account Type", "Paper Trading")
+        col4.metric("Strategies", "Momentum + Vol Arb")
         
-        # Show positions
+        # Show positions by strategy
         positions = paper_db.get_positions()
         if not positions.empty:
-            st.write("**Current Positions:**")
-            st.dataframe(positions[['symbol', 'quantity', 'avg_price', 'position_type']], use_container_width=True)
+            st.write("**Current Positions by Strategy:**")
+            
+            # Group by strategy type
+            if 'strategy_type' in positions.columns:
+                momentum_pos = positions[positions['strategy_type'] == 'momentum']
+                vol_arb_pos = positions[positions['strategy_type'] == 'vol_arbitrage']
+                
+                if not momentum_pos.empty:
+                    st.write("*Momentum Positions:*")
+                    st.dataframe(momentum_pos[['symbol', 'quantity', 'avg_price', 'position_type']], use_container_width=True)
+                
+                if not vol_arb_pos.empty:
+                    st.write("*Volatility Arbitrage Positions:*")
+                    st.dataframe(vol_arb_pos[['symbol', 'quantity', 'avg_price', 'position_type']], use_container_width=True)
+            else:
+                st.dataframe(positions[['symbol', 'quantity', 'avg_price', 'position_type']], use_container_width=True)
         else:
             st.info("No open positions")
         
     except Exception as e:
         st.error(f"Could not load account info: {e}")
     
-    # Show last run info
+    # Strategy status
     st.divider()
-    st.subheader("⏰ Bot Status")
+    st.subheader("⏰ Strategy Status")
     
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
-        if 'last_stock_run' in st.session_state:
-            st.metric("Last Stock Check", st.session_state.last_stock_run.strftime("%Y-%m-%d %H:%M:%S"))
+        if 'last_momentum_run' in st.session_state:
+            st.metric("Last Momentum Run", st.session_state.last_momentum_run.strftime("%H:%M:%S"))
         else:
-            st.metric("Last Stock Check", "Never run")
+            st.metric("Last Momentum Run", "Never")
     
     with col2:
-        if 'last_options_run' in st.session_state:
-            st.metric("Last Options Analysis", st.session_state.last_options_run.strftime("%Y-%m-%d %H:%M:%S"))
+        if 'last_vol_arb_run' in st.session_state:
+            st.metric("Last Vol Arb Run", st.session_state.last_vol_arb_run.strftime("%H:%M:%S"))
         else:
-            st.metric("Last Options Analysis", "Never run")
+            st.metric("Last Vol Arb Run", "Never")
+    
+    with col3:
+        if 'last_combined_run' in st.session_state:
+            st.metric("Last Combined Run", st.session_state.last_combined_run.strftime("%H:%M:%S"))
+        else:
+            st.metric("Last Combined Run", "Never")
 
 elif password_guess != "":
     st.error("❌ Incorrect password. Access denied.")
@@ -514,5 +739,5 @@ else:
 
 # Footer
 st.divider()
-st.caption("🔗 **Powered by Polygon.io** - Real-time market data with paper trading simulation")
-st.caption("⚠️ **Paper Trading Only** - No real money at risk!")
+st.caption("🔗 **Powered by Polygon.io** - Advanced volatility and momentum strategies")
+st.caption("⚠️ **Paper Trading Only** - Educational volatility arbitrage simulation")
