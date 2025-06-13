@@ -1,5 +1,9 @@
 # dashboard_with_ai_debug.py - Trading Dashboard with AI Debugging Integration
+
+# IMPORTANT: st.set_page_config MUST be the first Streamlit command
 import streamlit as st
+st.set_page_config(layout="wide", initial_sidebar_state="expanded")
+
 import configparser
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -320,7 +324,6 @@ def display_options_chain(polygon_api, symbol):
         st.error("Failed to fetch options chain")
 
 # --- STREAMLIT WEB APPLICATION WITH AI DEBUGGING ---
-st.set_page_config(layout="wide", initial_sidebar_state="expanded")
 st.title("🤖 AI-Enhanced Trading Dashboard - Stocks & Options")
 
 # Initialize AI Debugging System
